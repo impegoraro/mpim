@@ -8,6 +8,7 @@ import net.sf.jml.Email;
 import net.sf.jml.MsnContact;
 import net.sf.jml.MsnList;
 import net.sf.jml.MsnMessenger;
+import net.sf.jml.MsnOwner;
 import net.sf.jml.MsnSwitchboard;
 import net.sf.jml.MsnUserStatus;
 import net.sf.jml.event.MsnContactListAdapter;
@@ -76,6 +77,8 @@ public class MPIMMessenger extends Thread
 	}
 	
 	public void sendRoster(String id){
+		this.goToSleep();
+		
 		String toSend = MessageBuilder.buildRoster(id,email, getContacts());
 		try {
 			socket.write(ByteBuffer.wrap(toSend.getBytes()));
@@ -86,16 +89,33 @@ public class MPIMMessenger extends Thread
 	}
 	
 	public void sendContactListPresence(){
+		String toSend;
 		for( MsnContact cont : messenger.getContactList().getContactsInList(MsnList.AL)){
 			if(cont.getStatus() == MsnUserStatus.OFFLINE)
 				continue;
-			String toSend = "<presence from=\""+cont.getEmail().getEmailAddress()+"\" to=\""+email+"\" />";
+			
+			toSend = MessageBuilder.bluildContactPresence(email, cont);
 			try {
-				socket.write(ByteBuffer.wrap(toSend.getBytes()));
+				socket.write(ByteBuffer.wrap( toSend.getBytes() ));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
+	}
+	
+	public void setStatus(String show, String status){
+		MsnOwner own = messenger.getOwner();
+		
+		if(show == null || show.equals("chat"))
+			own.setStatus(MsnUserStatus.ONLINE);
+		else if(show.equals("away") || show.equals("xa"))
+			own.setStatus(MsnUserStatus.AWAY);
+		else if(show.equals("dnd"))
+			own.setStatus(MsnUserStatus.BUSY);
+		
+		if(status == null)
+			status = "";
+		own.setPersonalMessage(status);
 	}
 	
 	public MsnContact[] getContacts(){
@@ -161,6 +181,14 @@ public class MPIMMessenger extends Thread
 		public void contactStatusChanged(MsnMessenger messenger, MsnContact contact)
 		{
 			System.out.println(contact.getDisplayName() + ":" + contact.getStatus() + " from " + contact.getOldStatus());
+			
+			String toSend = MessageBuilder.bluildContactPresence(email, contact);
+			
+			try {
+				socket.write(ByteBuffer.wrap(toSend.getBytes()));
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 	
