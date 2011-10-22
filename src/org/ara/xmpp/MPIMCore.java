@@ -67,14 +67,9 @@ public class MPIMCore extends Thread
 						ServerSocketChannel ssc = (ServerSocketChannel) key.channel();
 						SocketChannel newClient = ssc.accept();
 						System.out.println("Accepted: incomming connection");
-
-						// configure socket to be non blocking
-						//newClient.configureBlocking(true); 
 						
 						MpimAuthenticate auth = new MpimAuthenticate(selector,  newClient);
 						auth.run();
-						//newClient.register(selector, SelectionKey.OP_READ, null);
-						//sockets.add(newClient);
 					}
 
 					if(key.isReadable()) {
@@ -85,8 +80,6 @@ public class MPIMCore extends Thread
 							continue; // bad packet
 
 						String x = new String(data.array());*/
-						
-						
 
 						//sc.configureBlocking(true);
 						MpimParseInput mpi = new MpimParseInput(key);

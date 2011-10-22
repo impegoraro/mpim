@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
+import net.sf.jml.Email;
 import net.sf.jml.MsnContact;
 import net.sf.jml.MsnList;
 import net.sf.jml.MsnMessenger;
@@ -28,6 +29,7 @@ public class MPIMMessenger extends Thread
 	private MsnMessenger messenger;
 	private MpimAuthenticate mpimAuth;
 	private SocketChannel socket;
+	private boolean signaled;
 	
 	public MPIMMessenger(String stremail, String strpwd, MpimAuthenticate ma, SocketChannel sc)
 	{
@@ -36,21 +38,40 @@ public class MPIMMessenger extends Thread
 		messenger = MsnMessengerFactory.createMsnMessenger(email, password);
 		mpimAuth = ma;
 		socket = sc;
-			
+		signaled = false;
+		
 		initListeners(messenger);
+	}
+	
+	public void sendMessage(String to, String msg)
+	{
+		messenger.sendText(Email.parseStr(to), new String(msg));
+	}
+
+	public void sendTyping(String to)
+	{
+		MsnSwitchboard tmp[] = messenger.getActiveSwitchboards();
+		
+		for(int i = 0; i< tmp.length; i++) {
+			MsnControlMessage mc = new MsnControlMessage();
+			mc.setTypingUser(to);
+			tmp[i].sendMessage(mc);
+		}
 	}
 	
 	public synchronized void goToSleep()
 	{
 		try {
-			this.wait();
+			if(!signaled)
+				this.wait();
 		} catch (InterruptedException e) {
 		}
-		
+		signaled = true;
 	}
 	
 	public synchronized void wakeMePlease()
 	{
+		signaled = true;
 		this.notify();
 	}
 	
@@ -147,16 +168,36 @@ public class MPIMMessenger extends Thread
 	{
 		public void instantMessageReceived(MsnSwitchboard switchboard, MsnInstantMessage message, MsnContact contact)
 		{
+			//static String id =  
 			//text message received
-			switchboard.sendMessage(message);
-			System.out.println(message.getContent()); //tirar a mensagem
+			//switchboard.sendMessage(message);
+			//System.out.println(message.getContent()); //tirar a mensagem
+			String response = "<message to='" + email + "' from='" +contact.getEmail() + "' type='chat'>" +
+					"<body>" + message.getContent() + "</body>" +
+					"<active xmlns='http://jabber.org/protocol/chatstates'/>" +
+					"</message>";
+			try {
+				socket.write(ByteBuffer.wrap(response.getBytes()));
+			} catch (IOException e) {
+			}
+					
 		}
 
 		public void controlMessageReceived(MsnSwitchboard switchboard, MsnControlMessage message, MsnContact contact)
 		{
 			//such as typing message and recording message
-			switchboard.sendMessage(message);
-			System.out.println(message);
+			//switchboard.sendMessage(message);
+			//System.out.println(message);
+			String tmp;
+			if((tmp = message.getTypingUser()) != null) {
+				String response = "<message to='" + email + "' from='" + tmp + "' type='chat'>" +
+						"<composing xmlns='http://jabber.org/protocol/chatstates'/>" +
+						"</message>";
+				try {
+					socket.write(ByteBuffer.wrap(response.getBytes()));
+				} catch (IOException e) {
+				}
+			}
 		}
 
 		public void datacastMessageReceived(MsnSwitchboard switchboard, MsnDatacastMessage message, MsnContact contact)
