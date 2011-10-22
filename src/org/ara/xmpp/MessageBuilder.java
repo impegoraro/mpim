@@ -36,17 +36,31 @@ public class MessageBuilder
 	}
 	
 	public static String bluildContactPresence(String email, MsnContact contact){
-		boolean added = true;
-		String toSend = "<presence from=\""+contact.getEmail().getEmailAddress()+"\" to=\""+email+"\" ";
+		boolean added = false;
+		String toSend = "<presence from=\""+contact.getEmail().getEmailAddress()+"\" to=\""+email+"\"";
 		
 		if(contact.getStatus() == MsnUserStatus.AWAY || contact.getStatus() == MsnUserStatus.BE_RIGHT_BACK || contact.getStatus() == MsnUserStatus.IDLE || contact.getStatus() == MsnUserStatus.OUT_TO_LUNCH){
-			toSend += "> <show>away</show>";
+			toSend += "> \n<show>away</show>";
 			added = true;
 		}
 		if(contact.getStatus() == MsnUserStatus.BUSY || contact.getStatus() == MsnUserStatus.OUT_TO_LUNCH){
-			toSend += "> <show>dnd</show>";
+			toSend += "> \n<show>dnd</show>";
+			added = true;
 		}
+		if(contact.getStatus() == MsnUserStatus.OFFLINE && contact.getOldStatus() != MsnUserStatus.OFFLINE)
+			toSend += "type=\"unavailable\"";
 		
+		
+		if(contact.getPersonalMessage() != null && contact.getPersonalMessage().length() > 0 ){
+			if(!added)
+				toSend +=">";
+			added = true;
+			toSend += "\n<status>"+contact.getPersonalMessage()+"</status>";
+		}
+		if(!added)
+			toSend += "/>";
+		else
+			toSend += "\n</presence>";
 		
 		return toSend;
 	}
