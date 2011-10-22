@@ -11,8 +11,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.ara.xmpp.Test.ConnectionState;
-
 public class MPIMCore extends Thread
 {
 
