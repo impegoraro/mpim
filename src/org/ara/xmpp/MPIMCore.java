@@ -11,10 +11,13 @@ import java.util.Iterator;
 
 public class MPIMCore
 {
+	private final static String prog_version = "0.1-alpha";
+	private final static String prog_name = "mpim";
+	private final static String[] prog_authors = { "Ilan Pegoraro <impegoraro@ua.pt> ", "Renato Almeida <renato.almeida@ua.pt>" };
 	private volatile Selector selector;
 	private ServerSocketChannel sChan;
-	//private List<SocketChannel> sockets;
-		
+
+	
 	ConnectionState state;
 	
 	public MPIMCore()
@@ -35,6 +38,21 @@ public class MPIMCore
 		//this.start();
 	}
 
+	public final String getVersion()
+	{
+		return prog_version;
+	}
+	
+	public final String getProgName()
+	{
+		return prog_name;
+	}
+	
+	public final String[] getAuthors()
+	{
+		return prog_authors;
+	}
+	
 	public void run()
 	{
 		Iterator<SelectionKey> it;
@@ -97,6 +115,22 @@ public class MPIMCore
 	public static void main(String args[])
 	{
 		MPIMCore mpim = new MPIMCore();
+		
+		if(args.length > 0){
+			if(args[0].equals("-v") || args[0].equals("--version")) {
+				System.out.println(mpim.getProgName() + " v" + mpim.getVersion() + " A simple XMPP proxy to other proprietary instant messaging protocol.");
+				for(String author : mpim.getAuthors()) {
+					System.out.println(author);
+				}
+				System.out.println("\nCopyright (C) 2011 Universidade de Aveiro\n" +
+						"This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.\n" +
+						"This is free software, and you are welcome to redistribute it"+ 
+						"under certain conditions; type `show c' for details.");
+				System.out.println("\n\n");
+				System.exit(0);
+			}
+				
+		}
 		
 		System.out.println("(II) Mpim server has been initialized");
 		System.out.println("(II) Waiting for connections...");
