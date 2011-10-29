@@ -8,21 +8,18 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 
-public class MPIMCore extends Thread
+public class MPIMCore
 {
-
 	private volatile Selector selector;
 	private ServerSocketChannel sChan;
-	private List<SocketChannel> sockets;
+	//private List<SocketChannel> sockets;
 		
 	ConnectionState state;
 	
 	public MPIMCore()
 	{
-		super("MPIM_Core");
+		//super("MPIM_Core");
 		try {
 			selector = Selector.open();
 			sChan = ServerSocketChannel.open();
@@ -31,14 +28,13 @@ public class MPIMCore extends Thread
 			sChan.configureBlocking(false);
 			sChan.socket().bind(iaddr);
 			sChan.register(selector, SelectionKey.OP_ACCEPT);
-			sockets = new LinkedList<SocketChannel>();
+			//sockets = new LinkedList<SocketChannel>();
 		} catch (IOException e) {
 		}
 
-		this.start();
+		//this.start();
 	}
 
-	@Override
 	public void run()
 	{
 		Iterator<SelectionKey> it;
@@ -52,8 +48,13 @@ public class MPIMCore extends Thread
 					SelectionKey key = (SelectionKey) it.next();
 
 					it.remove();
-					if(!key.isValid())
+					if(key == null) {
+						System.out.println("Got a null key");
+						System.exit(1);
+					}
+					if(!key.isValid()) {
 						continue;
+					}
 
 					//Finish connection in case of an error 
 					if(key.isConnectable()) {
@@ -66,7 +67,7 @@ public class MPIMCore extends Thread
 					if(key.isAcceptable()) { 
 						ServerSocketChannel ssc = (ServerSocketChannel) key.channel();
 						SocketChannel newClient = ssc.accept();
-						System.out.println("Accepted: incomming connection");
+						System.out.println("(II) Accepted incomming connection form " + ssc.socket().getInetAddress().getCanonicalHostName());
 						
 						MpimAuthenticate auth = new MpimAuthenticate(selector,  newClient);
 						auth.run();
@@ -82,6 +83,7 @@ public class MPIMCore extends Thread
 						String x = new String(data.array());*/
 
 						//sc.configureBlocking(true);
+						
 						MpimParseInput mpi = new MpimParseInput(key);
 						mpi.run();
 					}
@@ -96,7 +98,8 @@ public class MPIMCore extends Thread
 	{
 		MPIMCore mpim = new MPIMCore();
 		
-		System.out.println("Waiting for connections...");
+		System.out.println("(II) Mpim server has been initialized");
+		System.out.println("(II) Waiting for connections...");
 		mpim.run();
 	}
 }

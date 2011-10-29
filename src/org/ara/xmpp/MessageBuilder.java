@@ -1,6 +1,9 @@
 package org.ara.xmpp;
 
+import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 import net.sf.jml.MsnContact;
 import net.sf.jml.MsnGroup;
@@ -33,6 +36,44 @@ public class MessageBuilder
 		sw.append("</iq>");
 
 		return sw.toString();
+	}
+	
+	public static boolean sendRoster(SocketChannel out, String id, String email, MsnContact[] contacts)
+	{
+		String response;
+		
+		response = "<iq id='" + id + "' to='" + email + "' type='result'>";
+		response += "<query xmlns='jabber:iq:roster'>";
+
+		try {
+			out.write(ByteBuffer.wrap(response.getBytes()));
+		
+		for(MsnContact cont : contacts) {
+			response = "<item jid='" + cont.getEmail().toString() + "' name='" + cont.getDisplayName()
+					+ "' subscription='both'";
+			if(cont.getBelongGroups() != null && cont.getBelongGroups().length > 0) {
+				response +=">\n";
+				for(MsnGroup grp : cont.getBelongGroups()) {
+					response += "<group>" + grp.getGroupName() + "</group>";
+				}
+				response += "</item>";
+			} else {
+				response += "/>";
+			}
+			
+			out.write(ByteBuffer.wrap(response.getBytes()));
+		}
+		response += "</query>";
+		response += "</iq>";
+		
+		out.write(ByteBuffer.wrap(response.getBytes()));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return false;
+		}
+		
+		return true;
 	}
 	
 	public static String bluildContactPresence(String email, MsnContact contact){

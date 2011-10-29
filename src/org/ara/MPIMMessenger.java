@@ -22,6 +22,9 @@ import net.sf.jml.message.MsnInstantMessage;
 import org.ara.xmpp.ConnectionState;
 import org.ara.xmpp.MessageBuilder;
 import org.ara.xmpp.MpimAuthenticate;
+import org.ara.xmpp.stanzas.MessageChatStanza;
+import org.ara.xmpp.stanzas.MessageControlStanza;
+import org.ara.xmpp.stanzas.Stanza;
 
 public class MPIMMessenger extends Thread
 {
@@ -31,6 +34,7 @@ public class MPIMMessenger extends Thread
 	private MpimAuthenticate mpimAuth;
 	private SocketChannel socket;
 	private boolean signaled;
+	private boolean sendPresence;
 	
 	public MPIMMessenger(String stremail, String strpwd, MpimAuthenticate ma, SocketChannel sc)
 	{
@@ -40,6 +44,7 @@ public class MPIMMessenger extends Thread
 		mpimAuth = ma;
 		socket = sc;
 		signaled = false;
+		sendPresence = false;
 		
 		initListeners(messenger);
 	}
@@ -79,17 +84,24 @@ public class MPIMMessenger extends Thread
 	public void sendRoster(String id){
 		this.goToSleep();
 		
-		String toSend = MessageBuilder.buildRoster(id,email, getContacts());
-		try {
-			socket.write(ByteBuffer.wrap(toSend.getBytes()));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		//String toSend = MessageBuilder.buildRoster(id,email, getContacts());
+		//try {
+		//	socket.write(ByteBuffer.wrap(toSend.getBytes()));
+		//} catch (IOException e) {
+		//	e.printStackTrace();
+		//}
+		sendPresence = MessageBuilder.sendRoster(socket, id, email, getContacts());
+		System.out.println("Roster is ready");
 		sendContactListPresence();
 	}
 	
 	public void sendContactListPresence(){
 		String toSend;
+		
+		// not ready to send the presence
+		if(!sendPresence)
+			return;
+		
 		for( MsnContact cont : messenger.getContactList().getContactsInList(MsnList.AL)){
 			if(cont.getStatus() == MsnUserStatus.OFFLINE)
 				continue;
@@ -181,6 +193,10 @@ public class MPIMMessenger extends Thread
 		public void contactStatusChanged(MsnMessenger messenger, MsnContact contact)
 		{
 			System.out.println(contact.getDisplayName() + ":" + contact.getStatus() + " from " + contact.getOldStatus());
+
+			// not ready to send presence stanzas
+			if(!sendPresence) 
+				return;
 			
 			String toSend = MessageBuilder.bluildContactPresence(email, contact);
 			
@@ -200,12 +216,14 @@ public class MPIMMessenger extends Thread
 			//text message received
 			//switchboard.sendMessage(message);
 			//System.out.println(message.getContent()); //tirar a mensagem
-			String response = "<message to='" + email + "' from='" +contact.getEmail() + "' type='chat'>" +
+			/*String response = "<message to='" + email + "' from='" +contact.getEmail() + "' type='chat'>" +
 					"<body>" + message.getContent() + "</body>" +
 					"<active xmlns='http://jabber.org/protocol/chatstates'/>" +
-					"</message>";
+					"</message>";*/
+			Stanza msg = new MessageChatStanza(contact.getEmail().getEmailAddress(),email, message.getContent());
+			
 			try {
-				socket.write(ByteBuffer.wrap(response.getBytes()));
+				socket.write(ByteBuffer.wrap(msg.getStanza().getBytes()));
 			} catch (IOException e) {
 			}
 					
@@ -218,11 +236,13 @@ public class MPIMMessenger extends Thread
 			//System.out.println(message);
 			String tmp;
 			if((tmp = message.getTypingUser()) != null) {
-				String response = "<message to='" + email + "' from='" + tmp + "' type='chat'>" +
+				Stanza msg = new MessageControlStanza(tmp, email);
+
+				/*String response = "<message to='" + email + "' from='" + tmp + "' type='chat'>" +
 						"<composing xmlns='http://jabber.org/protocol/chatstates'/>" +
-						"</message>";
+						"</message>";*/
 				try {
-					socket.write(ByteBuffer.wrap(response.getBytes()));
+					socket.write(ByteBuffer.wrap(msg.getStanza().getBytes()));
 				} catch (IOException e) {
 				}
 			}

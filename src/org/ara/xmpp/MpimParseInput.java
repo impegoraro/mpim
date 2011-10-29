@@ -39,7 +39,12 @@ public class MpimParseInput extends Thread
 			if(parse.equals("\0") || parse.length()==0)
 				parse = null;
 			
-		}catch (Exception e) {
+		} catch(NullPointerException e) {
+			if(sc == null) {
+				System.out.println("Socket is null");
+				System.exit(1);
+			}
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
