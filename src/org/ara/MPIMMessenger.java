@@ -170,7 +170,7 @@ public class MPIMMessenger extends Thread
 		public void logout(MsnMessenger messenger)
 		{
 			System.out.println(messenger.getOwner().getEmail() + " logout");
-			mpimAuth.setState(ConnectionState.DISCONNECTED);
+			mpimAuth.setState(ConnectionState.NONAUTHENTICATED);
 			mpimAuth.wakeMePlease();
 		}
 
