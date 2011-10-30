@@ -74,7 +74,7 @@ public class MPIMCore
 						continue;
 					}
 
-					//Finish connection in case of an error 
+					// Finish connection in case of an error 
 					if(key.isConnectable()) {
 						SocketChannel ssc = (SocketChannel) key.channel();
 						if(ssc.isConnectionPending())
@@ -92,16 +92,6 @@ public class MPIMCore
 					}
 
 					if(key.isReadable()) {
-						/*SocketChannel sc = (SocketChannel) key.channel();
-						ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize());
-
-						if(sc.read(data) == -1)
-							continue; // bad packet
-
-						String x = new String(data.array());*/
-
-						//sc.configureBlocking(true);
-						
 						MpimParseInput mpi = new MpimParseInput(key);
 						mpi.run();
 					}

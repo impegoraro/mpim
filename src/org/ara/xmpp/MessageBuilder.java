@@ -2,8 +2,6 @@ package org.ara.xmpp;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 
 import net.sf.jml.MsnContact;
 import net.sf.jml.MsnGroup;
@@ -11,6 +9,7 @@ import net.sf.jml.MsnUserStatus;
 
 import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
+import org.ara.xmpp.stanzas.PresenceStanza;
 import org.ara.xmpp.stanzas.Stanza;
 
 public class MessageBuilder
@@ -45,7 +44,7 @@ public class MessageBuilder
 		return sw.toString();
 	}
 
-	public static void sendRoster(SocketChannel out, String id, String email, MsnContact[] contacts)
+	public static void sendRoster(XMPPConnection out, String id, String email, MsnContact[] contacts)
 	{
 		Stanza roster = new IQStanza(IQType.RESULT, id);
 		Stanza query = new Stanza("query");
@@ -76,7 +75,7 @@ public class MessageBuilder
 			}
 			
 
-			out.write(ByteBuffer.wrap(roster.getStanza().getBytes()));
+			out.write(roster);
 			
 
 		} catch (IOException e) {
@@ -84,6 +83,7 @@ public class MessageBuilder
 		}
 	}
 
+	@Deprecated
 	public static String bluildContactPresence(String email, MsnContact contact){
 		boolean added = false;
 		String toSend = "<presence from=\""+contact.getEmail().getEmailAddress()+"\" to=\""+email+"\"";
@@ -112,5 +112,23 @@ public class MessageBuilder
 			toSend += "\n</presence>";
 
 		return toSend;
+	}
+	
+	public static PresenceStanza bluildContactPresenceStanza(String email, MsnContact contact){
+		PresenceStanza presence = new PresenceStanza(contact.getEmail().getEmailAddress(), email);
+
+		if(contact.getStatus() == MsnUserStatus.AWAY || contact.getStatus() == MsnUserStatus.BE_RIGHT_BACK || contact.getStatus() == MsnUserStatus.IDLE || contact.getStatus() == MsnUserStatus.OUT_TO_LUNCH)
+			presence.setShow("away");
+		
+		if(contact.getStatus() == MsnUserStatus.BUSY)
+			presence.setShow("dnd");
+		
+		if(contact.getStatus() == MsnUserStatus.OFFLINE && contact.getOldStatus() != MsnUserStatus.OFFLINE)
+			presence.addAttribute("type", "unavailable");
+
+		if(contact.getPersonalMessage() != null && contact.getPersonalMessage().length() > 0 )
+			presence.setStatus(contact.getPersonalMessage());
+		
+		return presence;
 	}
 }

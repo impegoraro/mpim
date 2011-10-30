@@ -1,8 +1,6 @@
 package org.ara;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 
 import net.sf.jml.Email;
 import net.sf.jml.MsnContact;
@@ -22,9 +20,9 @@ import net.sf.jml.message.MsnInstantMessage;
 import org.ara.xmpp.ConnectionState;
 import org.ara.xmpp.MessageBuilder;
 import org.ara.xmpp.MpimAuthenticate;
+import org.ara.xmpp.XMPPConnection;
 import org.ara.xmpp.stanzas.MessageChatStanza;
 import org.ara.xmpp.stanzas.MessageControlStanza;
-import org.ara.xmpp.stanzas.Stanza;
 
 public class MPIMMessenger extends Thread
 {
@@ -32,17 +30,18 @@ public class MPIMMessenger extends Thread
 	private String password;
 	private MsnMessenger messenger;
 	private MpimAuthenticate mpimAuth;
-	private SocketChannel socket;
+	private XMPPConnection connection;
 	private boolean sendPresence;
 	private boolean signaled;
 	
-	public MPIMMessenger(String stremail, String strpwd, MpimAuthenticate ma, SocketChannel sc)
+	public MPIMMessenger(String stremail, String strpwd, MpimAuthenticate ma, XMPPConnection con)
 	{
+		assert(stremail != null && strpwd != null && ma != null && con != null);
 		email = stremail;
 		password = strpwd;
 		messenger = MsnMessengerFactory.createMsnMessenger(email, password);
 		mpimAuth = ma;
-		socket = sc;
+		connection = con;
 		signaled = sendPresence = false;
 		
 		initListeners(messenger);
@@ -72,13 +71,11 @@ public class MPIMMessenger extends Thread
 	public void sendRoster(String id) {
 		this.goToSleep();
 		
-		MessageBuilder.sendRoster(socket, id, email, getContacts());
+		MessageBuilder.sendRoster(connection, id, email, getContacts());
 
 	}
 	
 	public void sendContactListPresence(){
-		String toSend;
-		
 		// not ready to send the presence
 		if(!sendPresence)
 			return;
@@ -87,9 +84,8 @@ public class MPIMMessenger extends Thread
 			if(cont.getStatus() == MsnUserStatus.OFFLINE)
 				continue;
 			
-			toSend = MessageBuilder.bluildContactPresence(email, cont);
 			try {
-				socket.write(ByteBuffer.wrap( toSend.getBytes() ));
+				connection.write(MessageBuilder.bluildContactPresenceStanza(email, cont));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -182,10 +178,8 @@ public class MPIMMessenger extends Thread
 			System.out.println(contact.getDisplayName() + ":" + contact.getStatus() + " from " + contact.getOldStatus());
 			System.out.println("(II) Sending presence stanza");
 
-			String toSend = MessageBuilder.bluildContactPresence(email, contact);
-			
 			try {
-				socket.write(ByteBuffer.wrap(toSend.getBytes()));
+				connection.write(MessageBuilder.bluildContactPresenceStanza(email, contact));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -196,10 +190,8 @@ public class MPIMMessenger extends Thread
 	{
 		public void instantMessageReceived(MsnSwitchboard switchboard, MsnInstantMessage message, MsnContact contact)
 		{
-			Stanza msg = new MessageChatStanza(contact.getEmail().getEmailAddress(),email, message.getContent());
-			
 			try {
-				socket.write(ByteBuffer.wrap(msg.getStanza().getBytes()));
+				connection.write(new MessageChatStanza(contact.getEmail().getEmailAddress(),email, message.getContent()));
 			} catch (IOException e) {
 			}
 					
@@ -209,10 +201,8 @@ public class MPIMMessenger extends Thread
 		{
 			String tmp;
 			if((tmp = message.getTypingUser()) != null) {
-				Stanza msg = new MessageControlStanza(tmp, email);
-
 				try {
-					socket.write(ByteBuffer.wrap(msg.getStanza().getBytes()));
+					connection.write(new MessageControlStanza(tmp, email));
 				} catch (IOException e) {
 				}
 			}
@@ -224,6 +214,11 @@ public class MPIMMessenger extends Thread
 			switchboard.sendMessage(message);
 			System.out.println(message);
 		}
+	}
+	
+	public synchronized void close()
+	{
+		messenger.logout();
 	}
 	
 	public synchronized void goToSleep()

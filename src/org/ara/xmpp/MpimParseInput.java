@@ -1,5 +1,6 @@
 package org.ara.xmpp;
 
+import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.ByteBuffer;
@@ -17,17 +18,20 @@ import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
 import org.ara.MPIMMessenger;
+import org.ara.xmpp.stanzas.IQStanza;
+import org.ara.xmpp.stanzas.IQStanza.IQType;
+import org.ara.xmpp.stanzas.Stanza;
 
 public class MpimParseInput extends Thread
 {
 	private SocketChannel sc;
 	private String parse;
-	private MPIMMessenger msn;
+	private Proxy accounts;
 	public volatile String msg;
 	
 	public MpimParseInput(SelectionKey key){
 		sc = (SocketChannel) key.channel();
-		msn = (MPIMMessenger) key.attachment();
+		accounts = (Proxy) key.attachment();
 		
 		try{
 			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize());
@@ -81,7 +85,8 @@ public class MpimParseInput extends Thread
 							String x = null;
 							
 							if(event.isStartElement()) {
-
+								MPIMMessenger msn = accounts.getMSN();
+								
 								if(event.asStartElement().getName().getLocalPart().equals("query")) {
 									@SuppressWarnings("unchecked")
 									Iterator<Namespace> ii= event.asStartElement().getNamespaces();
@@ -90,18 +95,26 @@ public class MpimParseInput extends Thread
 										Namespace attr= ii.next();
 
 										String value =  attr.getValue();
-
-										if(value.equals("jabber:iq:roster"))
-											x = value;
+										System.out.println("(DEBUG) " + x);
+										x = value;
 									}
 									
-									if(x != null) {
-										Monitor m = new Monitor();
+									if(x.equals("jabber:iq:roster")) {
 										System.out.println("(II) Asking for roster");
 										
 										msn.sendRoster(id);
 										msn.setAllowPresence(true);
 										msn.sendContactListPresence();
+									} else  {
+										Stanza iqresult = new IQStanza(IQType.RESULT, id);
+										Stanza query = new Stanza("query", true);
+										query.addAttribute("xmlns", "http://jabber.org/protocol/disco#items");
+										iqresult.addChild(query);
+										try {
+											sc.write(ByteBuffer.wrap(iqresult.getStanza().getBytes()));
+										} catch (IOException e) {
+											e.printStackTrace();
+										}
 									}
 								}
 								
@@ -115,6 +128,13 @@ public class MpimParseInput extends Thread
 					} else if(event.asStartElement().getName().getLocalPart().equals("presence")) {
 						String show = null, status = null;
 						boolean sh = false, st = false;
+						Attribute attr = event.asStartElement().getAttributeByName(new QName("type"));
+						
+						if(attr != null && attr.getValue().equals("unavailable")) {
+							System.out.println("(II) Closing session");
+							accounts.close();
+							return;
+						}
 						
 						while(xmlEvents.hasNext()) {
 							event = xmlEvents.nextEvent();
@@ -138,7 +158,7 @@ public class MpimParseInput extends Thread
 							}
 							
 							if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("presence")){
-								msn.setStatus(show, status);
+								accounts.getMSN().setStatus(show, status);
 								break;
 							}
 						}
@@ -170,9 +190,9 @@ public class MpimParseInput extends Thread
 								
 								}else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("message")) {
 									if(attrType.getValue().equals("chat") && shouldSend)
-										msn.sendMessage(attrTo.getValue(), msg);
+										accounts.getMSN().sendMessage(attrTo.getValue(), msg);
 									if(composing)
-										msn.sendTyping(attrTo.getValue());
+										accounts.getMSN().sendTyping(attrTo.getValue());
 									break;
 								}
 							}

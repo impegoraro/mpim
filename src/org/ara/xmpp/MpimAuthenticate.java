@@ -6,12 +6,15 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.Calendar;
 import java.util.Iterator;
+import java.util.Random;
 
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLEventReader;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.events.Attribute;
 import javax.xml.stream.events.EndElement;
 import javax.xml.stream.events.Namespace;
 import javax.xml.stream.events.StartElement;
@@ -35,7 +38,6 @@ public class MpimAuthenticate extends Thread
 		domain = null;
 		state = ConnectionState.DISCONNECTED;
 		stream = new Stanza("stream:stream");
-		//id='++TR84Sm6A3hnt3Q065SnAbbk3Y'
 		stream.addAttribute("version", "1.0");
 		stream.addAttribute("xml:lang", "en");
 		stream.addAttribute("xmlns", "jabber:client");
@@ -70,12 +72,27 @@ public class MpimAuthenticate extends Thread
 						 *      Also handle TLS negotiation and SASL */
 						if(element.getName().getLocalPart().equals("stream")) {
 							domain = element.getAttributeByName(new QName("to")).getValue();
-
+							Attribute attr = element.getAttributeByName(new QName("to"));
+							String version = "";
+							
+							if(attr != null)
+								version = attr.getValue();
+							
+							Random r = new Random();
+							Calendar d = Calendar.getInstance();
+							r.setSeed(d.getTimeInMillis());
+							
 							stream.addAttribute("to", domain);
+							stream.addAttribute("id", "" + r.nextLong());
 							stream.addChild(new Stanza("stream:features", true));
 
 							sc.write(ByteBuffer.wrap(("<?xml version='1.0' ?>").getBytes()));
 							sc.write(ByteBuffer.wrap((stream.startTag() + stream.getChilds()).getBytes()));
+
+							if(!version.equals("1.0")) {
+								/* TODO: Send incompatible version back to the initiating entity and finish the connection */
+								
+							}
 
 							state = ConnectionState.AUTHENTICATING;
 						} else {
@@ -101,7 +118,7 @@ public class MpimAuthenticate extends Thread
 						if(element.getName().getLocalPart().equals("iq")) {
 							iq_type = element.getAttributeByName(new QName("type")).getValue();
 							iq_id = element.getAttributeByName(new QName("id")).getValue();
-							domain =  element.getAttributeByName(new QName("to")).getValue();
+							//domain =  element.getAttributeByName(new QName("to")).getValue();
 							
 							/*TODO: Should check if the type is right */
 							
@@ -174,8 +191,9 @@ public class MpimAuthenticate extends Thread
 								sc.write(ByteBuffer.wrap(iq.getStanza().getBytes()));
 
 							} else if(iq_type.equals("set")) {
-
-								if(username == null || domain == null || password == null) {
+								XMPPConnection con;
+								
+								if(username == null || domain == null || password == null || resource == null) {
 									System.err.println("(EE) Either the username, domain or password is empty");
 
 									Stanza iq_error = new Stanza("iq");
@@ -196,21 +214,21 @@ public class MpimAuthenticate extends Thread
 									sc.close();
 									break;
 								}
-
-								msn = new MPIMMessenger(username + "@" + domain, password, this, sc);
+								con = new XMPPConnection(sc, username, password, domain, resource);
+								msn = new MPIMMessenger(con.getBareJID(), password, this, con);
 								msn.start();
 
 								// should wait to see whether the login was successful 
 								goToSleep();
 								if(state == ConnectionState.AUTHENTICATED && msn != null) {
-									Stanza iqSuccess = new Stanza("iq");
+									Stanza iqSuccess = new Stanza("iq", true);
 									
 									iqSuccess.addAttribute("type", "result");
 									iqSuccess.addAttribute("id", iq_id);
 									sc.write(ByteBuffer.wrap(iqSuccess.getStanza().getBytes()));
 									
 									sc.configureBlocking(false);
-									sc.register(pool, SelectionKey.OP_READ, msn);
+									sc.register(pool, SelectionKey.OP_READ, new Proxy(con, msn));
 									break;
 									
 								} else if(state == ConnectionState.NONAUTHENTICATED) {
