@@ -28,6 +28,7 @@ public class MpimParseInput extends Thread
 	public MpimParseInput(SelectionKey key){
 		sc = (SocketChannel) key.channel();
 		msn = (MPIMMessenger) key.attachment();
+		
 		try{
 			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize());
 
@@ -40,10 +41,10 @@ public class MpimParseInput extends Thread
 				parse = null;
 			
 		} catch(NullPointerException e) {
-			if(sc == null) {
+			/*if(sc == null) {
 				System.out.println("Socket is null");
 				System.exit(1);
-			}
+			}*/
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -70,27 +71,19 @@ public class MpimParseInput extends Thread
 				if(event.isStartElement()) {
 					StartElement evTmp = event.asStartElement();
 
-					if(event.asStartElement().getName().getLocalPart().equals("iq")) {
-						String id="";
-						@SuppressWarnings("unchecked")
-						Iterator<Attribute> i= event.asStartElement().getAttributes();
+					if(evTmp.getName().getLocalPart().equals("iq")) {
+						String id ="";
 
-						while(i.hasNext()) {
-							Attribute attr = i.next();
-
-							String name = attr.getName().getLocalPart();
-							String value = attr.getValue();
-
-							if(name.equals("id"))
-								id = value;
-						}
+						id = evTmp.getAttributeByName(new QName("id")).getValue();
 
 						while(xmlEvents.hasNext()) {
 							event = xmlEvents.nextEvent();
 							String x = null;
-							if(event.isStartElement()){
+							
+							if(event.isStartElement()) {
 
 								if(event.asStartElement().getName().getLocalPart().equals("query")) {
+									@SuppressWarnings("unchecked")
 									Iterator<Namespace> ii= event.asStartElement().getNamespaces();
 
 									while(ii.hasNext()) {
@@ -101,18 +94,20 @@ public class MpimParseInput extends Thread
 										if(value.equals("jabber:iq:roster"))
 											x = value;
 									}
-									if(x != null){
-
-										System.out.println("sending roster");
-
+									
+									if(x != null) {
+										Monitor m = new Monitor();
+										System.out.println("(II) Asking for roster");
+										
 										msn.sendRoster(id);
+										msn.setAllowPresence(true);
+										msn.sendContactListPresence();
 									}
-
 								}
-
-								if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
-									break;
-							}
+								
+							} else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
+								break;
+							
 						}
 						if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
 							break;
@@ -147,6 +142,7 @@ public class MpimParseInput extends Thread
 								break;
 							}
 						}
+						
 					} else if(event.asStartElement().getName().getLocalPart().equals("message")) {
 						Attribute attrTo = event.asStartElement().getAttributeByName(new QName("to"));
 						Attribute attrID = event.asStartElement().getAttributeByName(new QName("id"));
@@ -190,5 +186,26 @@ public class MpimParseInput extends Thread
 			e.printStackTrace();
 		}
 
+	}
+	
+	public class Monitor
+	{
+		boolean signaled = false;
+		
+		public synchronized void goToSleep()
+		{
+			try {
+				if(!signaled)
+					this.wait();
+			} catch (InterruptedException e) {
+			}
+			signaled = true;
+		}
+		
+		public synchronized void wakeMePlease()
+		{
+			signaled = true;
+			this.notify();
+		}
 	}
 }

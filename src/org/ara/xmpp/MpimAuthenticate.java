@@ -102,7 +102,9 @@ public class MpimAuthenticate extends Thread
 							iq_type = element.getAttributeByName(new QName("type")).getValue();
 							iq_id = element.getAttributeByName(new QName("id")).getValue();
 							domain =  element.getAttributeByName(new QName("to")).getValue();
-
+							
+							/*TODO: Should check if the type is right */
+							
 						} else if(element.getName().getLocalPart().equals("query")) {
 							//Attribute attr = element.getAttributeByName(new QName("xmlns"));
 							String value = "";
@@ -129,6 +131,9 @@ public class MpimAuthenticate extends Thread
 							}
 							if(value.equals("jabber:iq:auth"))
 								state = ConnectionState.AUTHENTICATING;
+							else // wrong namespace for the iq stanza
+								break;
+							
 
 						} else if(element.getName().getLocalPart().equals("username")) {
 							event = xmlEvents.nextEvent();
@@ -172,13 +177,21 @@ public class MpimAuthenticate extends Thread
 
 								if(username == null || domain == null || password == null) {
 									System.err.println("(EE) Either the username, domain or password is empty");
-									Stanza error = new Stanza("iq");
-									Stanza notAuth = new Stanza("not-authorized", true);
+
+									Stanza iq_error = new Stanza("iq");
+									Stanza error = new Stanza("error");
+									Stanza conflict= new Stanza("conflict", true);
 									
-									error.addAttribute("type", "error");
-									error.addChild(notAuth);
+									error.addAttribute("code", "409");
+									error.addAttribute("type", "cancel");
+									conflict.addAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-stanzas");
 									
-									sc.write(ByteBuffer.wrap(error.getStanza().getBytes()));
+									error.addChild(conflict);
+									
+									iq_error.addAttribute("type", "error");
+									iq_error.addChild(error);
+									
+									sc.write(ByteBuffer.wrap(iq_error.getStanza().getBytes()));
 									sc.write(ByteBuffer.wrap(stream.getStanza().getBytes()));
 									sc.close();
 									break;

@@ -24,7 +24,7 @@ public class Stanza
 		this(name, simple, true);
 	}
 	
-	protected Stanza(String name, boolean simple, boolean childsTag)
+	public Stanza(String name, boolean simple, boolean childsTag)
 	{
 		assert(name != null);
 		
@@ -78,13 +78,13 @@ public class Stanza
 	public String endTag()
 	{
 		if(simple) 
-			return null;
+			return "";
 		return "</" + name + ">";
 	}
 	
 	public String getStanza()
 	{
-		return startTag() + getChilds() + endTag();
+		return startTag() + getChilds() + (isSimple() ? "" : endTag());
 	}
 	
 	@Override
@@ -93,7 +93,7 @@ public class Stanza
 		return startTag() + "\n" + getChilds(true) + "\n" + endTag(); 
 	}
 	
-	protected boolean setText(String text)
+	public boolean setText(String text)
 	{
 		if(allowChild)
 			return false;
@@ -107,10 +107,10 @@ public class Stanza
 		String stanza = "";
 		
 		if(!allowChild)
-			stanza = text;
+			stanza = (text == null)? "" : text;
 		else {
 			for(Stanza c : childs) {
-				stanza += c.startTag() + (newline ? "\n" : "") + c.getChilds(true) + (c.isSimple() ? "" : c.endTag());
+				stanza += c.startTag() + (newline ? "\n" : "") + c.getChilds(newline) + (c.isSimple() ? "" : c.endTag());
 			}
 		}
 		

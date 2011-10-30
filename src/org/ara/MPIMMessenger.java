@@ -33,8 +33,8 @@ public class MPIMMessenger extends Thread
 	private MsnMessenger messenger;
 	private MpimAuthenticate mpimAuth;
 	private SocketChannel socket;
-	private boolean signaled;
 	private boolean sendPresence;
+	private boolean signaled;
 	
 	public MPIMMessenger(String stremail, String strpwd, MpimAuthenticate ma, SocketChannel sc)
 	{
@@ -43,10 +43,14 @@ public class MPIMMessenger extends Thread
 		messenger = MsnMessengerFactory.createMsnMessenger(email, password);
 		mpimAuth = ma;
 		socket = sc;
-		signaled = false;
-		sendPresence = false;
+		signaled = sendPresence = false;
 		
 		initListeners(messenger);
+	}
+	
+	public synchronized void setAllowPresence(boolean allow)
+	{
+		sendPresence = allow;
 	}
 	
 	public void sendMessage(String to, String msg)
@@ -65,34 +69,11 @@ public class MPIMMessenger extends Thread
 		}
 	}
 	
-	public synchronized void goToSleep()
-	{
-		try {
-			if(!signaled)
-				this.wait();
-		} catch (InterruptedException e) {
-		}
-		signaled = true;
-	}
-	
-	public synchronized void wakeMePlease()
-	{
-		signaled = true;
-		this.notify();
-	}
-	
-	public void sendRoster(String id){
+	public void sendRoster(String id) {
 		this.goToSleep();
 		
-		//String toSend = MessageBuilder.buildRoster(id,email, getContacts());
-		//try {
-		//	socket.write(ByteBuffer.wrap(toSend.getBytes()));
-		//} catch (IOException e) {
-		//	e.printStackTrace();
-		//}
-		sendPresence = MessageBuilder.sendRoster(socket, id, email, getContacts());
-		System.out.println("Roster is ready");
-		sendContactListPresence();
+		MessageBuilder.sendRoster(socket, id, email, getContacts());
+
 	}
 	
 	public void sendContactListPresence(){
@@ -132,12 +113,14 @@ public class MPIMMessenger extends Thread
 	
 	public MsnContact[] getContacts(){
 		
-		MsnContact[] c; 
-		while(true){		
+		MsnContact[] c;
+		
+		while(true) {
 			c = messenger.getContactList().getContactsInList(MsnList.AL);
-			if(c == null || c.length == 0){
+			
+			if(c == null || c.length == 0) {
 				goToSleep();
-			}else{
+			} else {
 				break;
 			}
 		}
@@ -192,12 +175,13 @@ public class MPIMMessenger extends Thread
 
 		public void contactStatusChanged(MsnMessenger messenger, MsnContact contact)
 		{
-			System.out.println(contact.getDisplayName() + ":" + contact.getStatus() + " from " + contact.getOldStatus());
-
 			// not ready to send presence stanzas
 			if(!sendPresence) 
 				return;
 			
+			System.out.println(contact.getDisplayName() + ":" + contact.getStatus() + " from " + contact.getOldStatus());
+			System.out.println("(II) Sending presence stanza");
+
 			String toSend = MessageBuilder.bluildContactPresence(email, contact);
 			
 			try {
@@ -212,14 +196,6 @@ public class MPIMMessenger extends Thread
 	{
 		public void instantMessageReceived(MsnSwitchboard switchboard, MsnInstantMessage message, MsnContact contact)
 		{
-			//static String id =  
-			//text message received
-			//switchboard.sendMessage(message);
-			//System.out.println(message.getContent()); //tirar a mensagem
-			/*String response = "<message to='" + email + "' from='" +contact.getEmail() + "' type='chat'>" +
-					"<body>" + message.getContent() + "</body>" +
-					"<active xmlns='http://jabber.org/protocol/chatstates'/>" +
-					"</message>";*/
 			Stanza msg = new MessageChatStanza(contact.getEmail().getEmailAddress(),email, message.getContent());
 			
 			try {
@@ -231,16 +207,10 @@ public class MPIMMessenger extends Thread
 
 		public void controlMessageReceived(MsnSwitchboard switchboard, MsnControlMessage message, MsnContact contact)
 		{
-			//such as typing message and recording message
-			//switchboard.sendMessage(message);
-			//System.out.println(message);
 			String tmp;
 			if((tmp = message.getTypingUser()) != null) {
 				Stanza msg = new MessageControlStanza(tmp, email);
 
-				/*String response = "<message to='" + email + "' from='" + tmp + "' type='chat'>" +
-						"<composing xmlns='http://jabber.org/protocol/chatstates'/>" +
-						"</message>";*/
 				try {
 					socket.write(ByteBuffer.wrap(msg.getStanza().getBytes()));
 				} catch (IOException e) {
@@ -254,5 +224,21 @@ public class MPIMMessenger extends Thread
 			switchboard.sendMessage(message);
 			System.out.println(message);
 		}
+	}
+	
+	public synchronized void goToSleep()
+	{
+		try {
+			if(!signaled)
+				this.wait();
+		} catch (InterruptedException e) {
+		}
+		signaled = true;
+	}
+	
+	public synchronized void wakeMePlease()
+	{
+		signaled = true;
+		this.notify();
 	}
 }
