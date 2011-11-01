@@ -20,13 +20,15 @@ public class MessageBuilder
 	public static String buildRoster(String id, String email, MsnContact[] contacts)
 	{
 		StringWriter sw = new StringWriter();
-
+		String displayName;
+		
 		sw.append("<iq id='" + id + "' to='" + email + "' type='result' ver='ver15'>\n");
 
 		sw.append("  <query xmlns='jabber:iq:roster'>\n");
 
 		for(MsnContact cont : contacts) {
-			sw.append("    <item jid='" + cont.getEmail().toString() + "' name='" +  cont.getEmail().toString() //cont.getDisplayName().replaceAll("(\"|')", "_")
+			displayName = cont.getDisplayName().replaceAll("[\"<>']", "_");
+			sw.append("    <item jid='" + cont.getEmail().toString() + "' name='" +  displayName 
 					+ "' subscription='both'");
 			if(cont.getBelongGroups() != null && cont.getBelongGroups().length > 0) {
 				sw.append(">\n");
@@ -48,7 +50,8 @@ public class MessageBuilder
 	{
 		Stanza roster = new IQStanza(IQType.RESULT, id);
 		Stanza query = new Stanza("query");
-
+		String displayName;
+		
 		query.addAttribute("xmlns", "jabber:iq:roster");
 		
 		roster.addAttribute("to", email);
@@ -58,9 +61,9 @@ public class MessageBuilder
 		try {
 			for(MsnContact cont : contacts) {
 				Stanza item = new Stanza("item");
-
+				displayName = cont.getDisplayName().replaceAll("[\"<>']", "_");
 				item.addAttribute("jid", cont.getEmail().toString());
-				item.addAttribute("name",cont.getEmail().toString()); //cont.getDisplayName().replaceAll("(\"|')", "_"));
+				item.addAttribute("name", displayName);
 				item.addAttribute("subscription", "both");
 
 				if(cont.getBelongGroups() != null && cont.getBelongGroups().length > 0) {

@@ -74,7 +74,7 @@ public class MpimParseInput extends Thread
 				if(event.isStartDocument() ) {
 					continue;
 				}
-				System.out.println(event.toString());
+				//System.out.println(event.toString());
 							
 				
 				if(event.isStartElement()) {
@@ -87,7 +87,7 @@ public class MpimParseInput extends Thread
 						boolean tmp = true;
 						
 						while(xmlEvents.hasNext()) {
-							System.out.println(":: Inner:  " + event.toString());
+							//System.out.println(":: Inner:  " + event.toString());
 
 							event = xmlEvents.nextEvent();
 							String namespace = "";
@@ -174,8 +174,9 @@ public class MpimParseInput extends Thread
 							break;
 						
 					} else if(event.asStartElement().getName().getLocalPart().equals("presence")) {
-						String show = null, status = null;
-						boolean sh = false, st = false;
+						String show = null, status = null, nick = null;
+						boolean sh = false, st = false, nk = false;
+						
 						Attribute attr = event.asStartElement().getAttributeByName(new QName("type"));
 						
 						if(attr != null && attr.getValue().equals("unavailable")) {
@@ -190,23 +191,26 @@ public class MpimParseInput extends Thread
 							if(event.isStartElement()){
 								if(event.asStartElement().getName().getLocalPart().equals("show")) {
 									sh = true;
-								}
-								if(event.asStartElement().getName().getLocalPart().equals("status")){ 
+								} else if(event.asStartElement().getName().getLocalPart().equals("status")){ 
 									st = true;
+								} else if(event.asStartElement().getName().getLocalPart().equals("nick")){ 
+									nk = true;
 								}
 							}
 							
 							if(sh && event.isCharacters()){
 								show = event.asCharacters().getData();
 								sh = false;
-							}
-							if(st && event.isCharacters()){
+							} else if(st && event.isCharacters()){
 								status = event.asCharacters().getData();
 								st = false;
+							} else if(nk && event.isCharacters()){ 
+								nk = false;
+								nick = event.asCharacters().getData();
 							}
 							
 							if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("presence")){
-								accounts.getMSN().setStatus(show, status);
+								accounts.getMSN().setStatus(show, status, nick);
 								break;
 							}
 						}

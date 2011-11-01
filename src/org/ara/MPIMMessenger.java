@@ -92,7 +92,7 @@ public class MPIMMessenger extends Thread
 		}
 	}
 	
-	public void setStatus(String show, String status){
+	public void setStatus(String show, String status, String nick){
 		MsnOwner own = messenger.getOwner();
 		
 		if(show == null || show.equals("chat"))
@@ -104,6 +104,8 @@ public class MPIMMessenger extends Thread
 		
 		if(status == null)
 			status = "";
+		if(nick != null)
+			own.setDisplayName(nick);
 		own.setPersonalMessage(status);
 	}
 	
