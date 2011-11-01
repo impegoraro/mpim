@@ -36,4 +36,9 @@ public class Entity {
 		password = "";
 	}
 	
+	public String getDomain()
+	{
+		return domain;
+	}
+	
 }

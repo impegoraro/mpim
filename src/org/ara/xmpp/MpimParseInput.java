@@ -71,16 +71,24 @@ public class MpimParseInput extends Thread
 
 			while(xmlEvents.hasNext()) {
 				event = xmlEvents.nextEvent();
+				if(event.isStartDocument() ) {
+					continue;
+				}
 				System.out.println(event.toString());
+							
+				
 				if(event.isStartElement()) {
 					StartElement evTmp = event.asStartElement();
-
+				
 					if(evTmp.getName().getLocalPart().equals("iq")) {
 						String id ="";
 
 						id = evTmp.getAttributeByName(new QName("id")).getValue();
-boolean tmp = true;
+						boolean tmp = true;
+						
 						while(xmlEvents.hasNext()) {
+							System.out.println(":: Inner:  " + event.toString());
+
 							event = xmlEvents.nextEvent();
 							String namespace = "";
 							
@@ -127,18 +135,36 @@ boolean tmp = true;
 										} catch (IOException e) {
 											e.printStackTrace();
 										}
-									} 
+									}/* else if(namespace.equals("http://jabber.org/protocol/disco#info")) { 
+										
+										System.out.println("(II) Sending features request");
+										
+										Stanza iqresult = new IQStanza(IQType.RESULT, id);
+										Stanza query = new Stanza("query");
+										query.addAttribute("xmlns", namespace);
+										Stanza pingFeature = new Stanza("feature", true);
+										pingFeature.addAttribute("var", "urn:xmpp:ping");
+										query.addChild(pingFeature);
+										
+										try {
+											sc.write(ByteBuffer.wrap(iqresult.getStanza().getBytes()));
+										} catch (IOException e) {
+											e.printStackTrace();
+										}
+									} */
 									
 									
 								}
 								
 							} else if((event.isStartElement()) && event.asStartElement().getName().getLocalPart().equals("ping")) {
 								IQStanza pong = new IQStanza(IQType.RESULT, id);
+								System.out.println("(II) Sending ping reponse");
+								
 								try {
 									accounts.getConnection().write(pong);
 								} catch (IOException e) {
 								}
-							}else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq")) {
+							} else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq")) {
 								tmp = false;
 								break;
 							}
@@ -220,10 +246,17 @@ boolean tmp = true;
 							}
 						}
 					} 
-					/* TODO: handle the </stream:stream> ending tag */
-
-
+				} else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("stream:stream")) {
+					
+					System.out.println("(II) Client «" + accounts.getConnection().getJID() + "» has terminated the session");
+					if(sc.isConnected()) {
+						accounts.close();
+					} else {
+						System.out.println("(WW) Client «" + accounts.getConnection().getJID() + "» has closed the socket");
+						/*TODO: remove socket from pool of sockets*/
+					}
 				}
+					
 			}
 		} catch (XMLStreamException e) {
 			e.printStackTrace();
