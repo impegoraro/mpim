@@ -7,6 +7,7 @@ import net.sf.jml.MsnContact;
 import net.sf.jml.MsnList;
 import net.sf.jml.MsnMessenger;
 import net.sf.jml.MsnOwner;
+import net.sf.jml.MsnProtocol;
 import net.sf.jml.MsnSwitchboard;
 import net.sf.jml.MsnUserStatus;
 import net.sf.jml.event.MsnContactListAdapter;
@@ -40,6 +41,7 @@ public class MPIMMessenger extends Thread
 		email = stremail;
 		password = strpwd;
 		messenger = MsnMessengerFactory.createMsnMessenger(email, password);
+		messenger.setSupportedProtocol(new MsnProtocol[] {MsnProtocol.MSNP12});
 		mpimAuth = ma;
 		connection = con;
 		signaled = sendPresence = false;
@@ -191,7 +193,7 @@ public class MPIMMessenger extends Thread
 		public void instantMessageReceived(MsnSwitchboard switchboard, MsnInstantMessage message, MsnContact contact)
 		{
 			try {
-				connection.write(new MessageChatStanza(contact.getEmail().getEmailAddress(),email, message.getContent()));
+				connection.write(new MessageChatStanza(contact.getEmail().getEmailAddress(),email, encodeHTML(message.getContent())));
 			} catch (IOException e) {
 			}
 					
@@ -235,5 +237,18 @@ public class MPIMMessenger extends Thread
 	{
 		signaled = true;
 		this.notify();
+	}
+	
+	public static String encodeHTML(String s) {
+		StringBuffer out = new StringBuffer();
+		for (int i = 0; i < s.length(); i++) {
+			char c = s.charAt(i);
+			if (c > 127 || c == '"' || c == '<' || c == '>' || c == '&') {
+				out.append("&#" + (int) c + ";");
+			} else {
+				out.append(c);
+			}
+		}
+		return out.toString();
 	}
 }
