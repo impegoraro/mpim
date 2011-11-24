@@ -83,6 +83,7 @@ public class MpimParseInput extends Thread
 						while(xmlEvents.hasNext()) {
 							event = xmlEvents.nextEvent();
 							String x = null;
+							String namespace;
 							
 							if(event.isStartElement()) {
 								MPIMMessenger msn = accounts.getMSN();
@@ -90,12 +91,14 @@ public class MpimParseInput extends Thread
 								if(event.asStartElement().getName().getLocalPart().equals("query")) {
 									@SuppressWarnings("unchecked")
 									Iterator<Namespace> ii= event.asStartElement().getNamespaces();
-
+									Attribute attrNS = event.asStartElement().getAttributeByName(new QName("xmlns"));
+									
+									namespace = (attrNS != null) ? attrNS.getValue() : "";
+									
 									while(ii.hasNext()) {
 										Namespace attr= ii.next();
 
 										String value =  attr.getValue();
-										System.out.println("(DEBUG) " + x);
 										x = value;
 									}
 									
@@ -105,11 +108,22 @@ public class MpimParseInput extends Thread
 										msn.sendRoster(id);
 										msn.setAllowPresence(true);
 										msn.sendContactListPresence();
-									} else  {
+										
+									} else  {//if(namespace.equals("http://jabber.org/protocol/disco#info"))
+										System.out.println("(II) Sending Service unavailable");
 										Stanza iqresult = new IQStanza(IQType.RESULT, id);
 										Stanza query = new Stanza("query", true);
+										Stanza error = new Stanza("error");
+										Stanza notAllowd = new Stanza("service-unavailable", true);
+										error.addAttribute("type", "cancel");
+										
 										query.addAttribute("xmlns", "http://jabber.org/protocol/disco#items");
+										query.addAttribute("node", "http://jabber.org/protocol/commands");
 										iqresult.addChild(query);
+										iqresult.addChild(error);
+										notAllowd.addAttribute("xmlns" ,"urn:ietf:params:xml:ns:xmpp-stanzas");
+										error.addChild(notAllowd);
+										
 										try {
 											sc.write(ByteBuffer.wrap(iqresult.getStanza().getBytes()));
 										} catch (IOException e) {
@@ -118,7 +132,13 @@ public class MpimParseInput extends Thread
 									}
 								}
 								
-							} else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
+							} else if((event.isStartElement()) && event.asStartElement().getName().getLocalPart().equals("ping")) {
+								IQStanza pong = new IQStanza(IQType.RESULT, id);
+								try {
+									accounts.getConnection().write(pong);
+								} catch (IOException e) {
+								}
+							}else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
 								break;
 							
 						}
@@ -197,7 +217,8 @@ public class MpimParseInput extends Thread
 								}
 							}
 						}
-					}
+					} 
+					/* TODO: handle the </stream:stream> ending tag */
 
 
 				}
