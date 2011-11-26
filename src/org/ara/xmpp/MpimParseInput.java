@@ -7,32 +7,38 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.Iterator;
 
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLEventReader;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.events.Attribute;
+import javax.xml.stream.events.Namespace;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
 import org.ara.MPIMMessenger;
 import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
+import org.ara.xmpp.stanzas.MessageChatStanza;
+import org.ara.xmpp.stanzas.PresenceStanza;
 import org.ara.xmpp.stanzas.Stanza;
 
 public class MpimParseInput //extends Thread
 {
+	static private long thid = 0; 
 	private SocketChannel sc;
 	private String parse;
 	private Proxy accounts;
-	static private long thid = 0; 
-	
+	private StanzaState state;
+
 	public MpimParseInput(SelectionKey key){
 		sc = (SocketChannel) key.channel();
 		accounts = (Proxy) key.attachment();
 		thid++;
-		
+		state = StanzaState.CLEAN;
+
 		try{
 			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize());
 
@@ -44,15 +50,17 @@ public class MpimParseInput //extends Thread
 
 			if(parse.equals("\0") || parse.length()==0)
 				parse = null;
-			
+
 		} catch(ClosedChannelException e) {
 			System.out.println("(WW) Closed channel ");
 			accounts.close();
+
 		} catch(NullPointerException e) {
 			if(sc == null) {
 				System.out.println("(EE) Unrecoverable error: the socket is null. Ending the application");
 				System.exit(1);
 			}
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -61,14 +69,15 @@ public class MpimParseInput //extends Thread
 	//@Override
 	public void run()
 	{
-		System.out.println("Thread " + thid + " is running");
+		String id = "";
+		Stanza stanza = null;
 		
+		System.out.println("Thread " + thid + " is running");
+
 		if(parse == null) {
 			System.out.println("(DEBUG) Thread " + thid + " has finished without information");
 			return;
 		}
-		
-		//System.out.println("#####\n"+ parse + "\n#####");
 
 		XMLInputFactory xmlFactory = XMLInputFactory.newInstance();
 		Reader reader = new StringReader(parse);
@@ -81,184 +90,175 @@ public class MpimParseInput //extends Thread
 
 			while(xmlEvents.hasNext()) {
 				event = xmlEvents.nextEvent();
+				String namespace;
 
-				if(event.isStartElement()) {
-					StartElement evTmp = event.asStartElement();
+				if(state == StanzaState.CLEAN) {
 
-					if(evTmp.getName().getLocalPart().equals("iq")) {
-						String id ="";
+					if(event.isStartElement()) {
+						StartElement evTmp = event.asStartElement();
 
-						id = evTmp.getAttributeByName(new QName("id")).getValue();
-
-						while(xmlEvents.hasNext()) {
-							event = xmlEvents.nextEvent();
-							String namespace;
+						if(evTmp.getName().getLocalPart().equals("iq")) {	
+							id = evTmp.getAttributeByName(new QName("id")).getValue();
+							state = StanzaState.IQ;
 							
-							if(event.isStartElement()) {
-								MPIMMessenger msn = accounts.getMSN();
-								
-								if(event.asStartElement().getName().getLocalPart().equals("query")) {
-									//@SuppressWarnings("unchecked")
-									//Iterator<Namespace> ii= event.asStartElement().getNamespaces();
-									Attribute attrNS = event.asStartElement().getAttributeByName(new QName("xmlns"));
-									
-									namespace = (attrNS != null) ? attrNS.getValue() : "";
-									
-									/*while(ii.hasNext()) {
-										Namespace attr= ii.next();
-										String value =  attr.getValue();
-										x = value;
-									} */
-									
-									if(namespace.equals("jabber:iq:roster")) {
-										System.out.println("(II) Asking for roster");
-										
-										msn.sendRoster(id);
-										msn.setAllowPresence(true);
-										msn.sendContactListPresence();
-										
-									} else if(namespace.equals("http://jabber.org/protocol/disco#info")) {
-										System.out.println("(II) Sending Service unavailable (info)");
-
-										Stanza iqresult = new IQStanza(IQType.RESULT, id);
-										Stanza query = new Stanza("query", true);
-										Stanza error = new Stanza("error");
-										Stanza notAllowd = new Stanza("service-unavailable", true);
-										error.addAttribute("type", "cancel");
-										
-										query.addAttribute("xmlns", "http://jabber.org/protocol/disco#info");
-										query.addAttribute("node", "http://jabber.org/protocol/commands");
-										iqresult.addChild(query);
-										iqresult.addChild(error);
-										notAllowd.addAttribute("xmlns" ,"urn:ietf:params:xml:ns:xmpp-stanzas");
-										error.addChild(notAllowd);
-										
-										try {
-											accounts.getConnection().write(iqresult);
-										} catch (IOException e) {
-											e.printStackTrace();
-										}
-										
-										
-									} else if(namespace.equals("http://jabber.org/protocol/disco#items")) {
-										System.out.println("(II) Sending Service unavailable (items)");
-
-										Stanza iqresult = new IQStanza(IQType.RESULT, id);
-										Stanza query = new Stanza("query", true);
-										Stanza error = new Stanza("error");
-										Stanza notAllowd = new Stanza("service-unavailable", true);
-										error.addAttribute("type", "cancel");
-										
-										query.addAttribute("xmlns", "http://jabber.org/protocol/disco#items");
-										query.addAttribute("node", "http://jabber.org/protocol/commands");
-										iqresult.addChild(query);
-										iqresult.addChild(error);
-										notAllowd.addAttribute("xmlns" ,"urn:ietf:params:xml:ns:xmpp-stanzas");
-										error.addChild(notAllowd);
-										
-										try {
-											sc.write(ByteBuffer.wrap(iqresult.getStanza().getBytes()));
-										} catch (IOException e) {
-											e.printStackTrace();
-										}
-									} else {
-										System.out.println("(WW) Unsuporrted namespace: '" + namespace+ "'");
-									}
-								}
-								
-							} else if((event.isStartElement()) && event.asStartElement().getName().getLocalPart().equals("ping")) {
-								System.out.println("(II) Sending ping reply...");
-								IQStanza pong = new IQStanza(IQType.RESULT, id);
-								try {
-									accounts.getConnection().write(pong);
-								} catch (IOException e) {
-								}
-							} else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
-								continue;
+						} else if(evTmp.getName().getLocalPart().equals("presence")) {
+							stanza = new PresenceStanza(null, null);
 							
-						}
-						if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
-							continue;
-						
-					// End of while for IQ stanzas 	
-					} else if(event.asStartElement().getName().getLocalPart().equals("presence")) {
-						String show = null, status = null;
-						boolean sh = false, st = false;
-						Attribute attr = event.asStartElement().getAttributeByName(new QName("type"));
-						
-						if(attr != null && attr.getValue().equals("unavailable")) {
-							System.out.println("(II) Closing session");
-							accounts.close();
-							return;
-						}
-						
-						while(xmlEvents.hasNext()) {
-							event = xmlEvents.nextEvent();
+							state = StanzaState.PRECENSE;
+							
+						} else if(evTmp.getName().getLocalPart().equals("message")) {
+							Attribute attrTo = event.asStartElement().getAttributeByName(new QName("to"));
+							
+							stanza = new MessageChatStanza(null, attrTo.getValue());
 
-							if(event.isStartElement()){
-								if(event.asStartElement().getName().getLocalPart().equals("show")) {
-									sh = true;
-								}
-								if(event.asStartElement().getName().getLocalPart().equals("status")){ 
-									st = true;
-								}
-							}
-							
-							if(sh && event.isCharacters()){
-								show = event.asCharacters().getData();
-								sh = false;
-							}
-							if(st && event.isCharacters()){
-								status = event.asCharacters().getData();
-								st = false;
-							}
-							
-							if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("presence")){
-								accounts.getMSN().setStatus(show, status);
-								continue;
-							}
+							state = StanzaState.MESSAGE;
 						}
-						
-					} else if(event.asStartElement().getName().getLocalPart().equals("message")) {
-						Attribute attrTo = event.asStartElement().getAttributeByName(new QName("to"));
-						Attribute attrID = event.asStartElement().getAttributeByName(new QName("id"));
-						Attribute attrType = event.asStartElement().getAttributeByName(new QName("type"));
-						String msg = "";
-						
-						if(attrTo == null || attrID == null) { 
-							/*TODO: send error to client. */
-						} else {
-							boolean shouldSend = false;
-							boolean composing = false;
-							while(xmlEvents.hasNext()) {
-								event = xmlEvents.nextEvent();
-								
-								if(event.isStartElement() && event.asStartElement().getName().getLocalPart().equals("body")){
-									shouldSend = true;
-									event = xmlEvents.nextEvent();	
-									if(event.isCharacters())
-										msg = new String(event.asCharacters().getData());									
-								
-								} else if(event.isStartElement() && event.asStartElement().getName().getLocalPart().equals("composing")) {
-									composing = true; 
-								} else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("body")) {
-									//System.out.println("Sending message to: " + attrTo.getValue() + ", " + msg);
-								
-								}else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("message")) {
-									if(attrType.getValue().equals("chat") && shouldSend)
-										accounts.getMSN().sendMessage(attrTo.getValue(), msg);
-									if(composing)
-										accounts.getMSN().sendTyping(attrTo.getValue());
-									continue;
-								}
-							}
-						}
-					} else if(event.isEndElement()) {
-						/* TODO: handle the </stream:stream> ending tag */
-						accounts.close();
 					}
 
+				} else if (state == StanzaState.IQ) {
+					if(event.isStartElement()) {
+						if(event.asStartElement().getName().getLocalPart().equals("query")) {
+							MPIMMessenger msn = accounts.getMSN();
+							Iterator i = event.asStartElement().getNamespaces();
+							
+							namespace = "";
+							while(i.hasNext()) {
+								Namespace ns = (Namespace) i.next();
+								namespace = ns.getValue();
+							}
+							
+							if(namespace.equals("jabber:iq:roster")) {
+								System.out.println("(II) Asking for roster");
 
+								msn.sendRoster(id);
+								msn.setAllowPresence(true);
+								msn.sendContactListPresence();
+
+							} else if(namespace.equals("http://jabber.org/protocol/disco#info")) {
+								System.out.println("(II) Sending Service unavailable (info)");
+
+								Stanza iqresult = new IQStanza(IQType.RESULT, id);
+								Stanza query = new Stanza("query", true);
+								Stanza error = new Stanza("error");
+								Stanza notAllowd = new Stanza("service-unavailable", true);
+								error.addAttribute("type", "cancel");
+
+								query.addAttribute("xmlns", "http://jabber.org/protocol/disco#info");
+								query.addAttribute("node", "http://jabber.org/protocol/commands");
+								iqresult.addChild(query);
+								iqresult.addChild(error);
+								notAllowd.addAttribute("xmlns" ,"urn:ietf:params:xml:ns:xmpp-stanzas");
+								error.addChild(notAllowd);
+
+								try {
+									accounts.getConnection().write(iqresult);
+								} catch (IOException e) {
+									e.printStackTrace();
+								}
+
+
+							} else if(namespace.equals("http://jabber.org/protocol/disco#items")) {
+								System.out.println("(II) Sending Service unavailable (items)");
+
+								Stanza iqresult = new IQStanza(IQType.RESULT, id);
+								Stanza query = new Stanza("query", true);
+								Stanza error = new Stanza("error");
+								Stanza notAllowd = new Stanza("service-unavailable", true);
+								error.addAttribute("type", "cancel");
+
+								query.addAttribute("xmlns", "http://jabber.org/protocol/disco#items");
+								query.addAttribute("node", "http://jabber.org/protocol/commands");
+								iqresult.addChild(query);
+								iqresult.addChild(error);
+								notAllowd.addAttribute("xmlns" ,"urn:ietf:params:xml:ns:xmpp-stanzas");
+								error.addChild(notAllowd);
+
+								try {
+									sc.write(ByteBuffer.wrap(iqresult.getStanza().getBytes()));
+								} catch (IOException e) {
+									e.printStackTrace();
+								}
+							} else {
+								System.out.println("(WW) Unsuported namespace: '" + namespace+ "' id is " + id);
+							}
+						} else if(event.asStartElement().getName().getLocalPart().equals("ping")) {
+							IQStanza pong = new IQStanza(IQType.RESULT, id);
+
+							System.out.println("(II) Sending ping reply...");
+
+							try {
+								accounts.getConnection().write(pong);
+							} catch (IOException e) {
+							}
+						}
+					} else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq")) {
+						state = StanzaState.CLEAN;
+						stanza = null;
+					}
+
+				} else if(state == StanzaState.PRECENSE) {
+				
+					if(event.isStartElement()) {						
+						if(event.asStartElement().getName().getLocalPart().equals("show") || 
+						   event.asStartElement().getName().getLocalPart().equals("status")) {
+							
+							Stanza tmp = new Stanza(event.asStartElement().getName().getLocalPart(), true);
+							tmp.setText(xmlEvents.nextEvent().asCharacters().getData());
+							stanza.addChild(tmp);
+						}
+						
+					} else if(event.isEndElement()) {
+
+						if(event.asEndElement().getName().getLocalPart().equals("presence")) {
+							String status = null;
+							String show = null;
+							
+							try{
+								show = stanza.getChildValue("show");
+								status = stanza.getChildValue("status");
+							} catch(Exception e){
+							}
+							
+							accounts.getMSN().setStatus((show == null)? "" : show, (status == null)? "" : status);
+							
+							stanza = null;
+							state = StanzaState.CLEAN;
+						}
+					}
+					
+				} else if(state == StanzaState.MESSAGE) {
+					
+					if(event.isStartElement()) {
+						if(event.asStartElement().getName().getLocalPart().equals("body")) {
+							String msg; 
+							
+							xmlEvents.next();
+							event = xmlEvents.nextEvent();
+							msg = event.asCharacters().getData();
+							((MessageChatStanza) stanza).setBody(msg);
+							event = xmlEvents.nextEvent();
+						}
+						
+					} else if(event.isEndElement()) {
+						if(event.asEndElement().getName().getLocalPart().equals("message")) {
+							if(stanza instanceof MessageChatStanza) {
+								String msg = null;
+								
+								try {
+									msg = stanza.getChildValue("body");
+								} catch (Exception e) {
+								}
+								
+								if(msg != null && stanza.getAttributeByName("to") != null)
+									accounts.getMSN().sendMessage(stanza.getAttributeByName("to"), msg);
+								else 
+									System.err.println("(DEBUG) The message is " + msg + "and the to attribute is "+ stanza.getAttributeByName("to"));
+							}
+
+							state = StanzaState.CLEAN;
+							stanza = null;
+						}
+					}
 				}
 			}			
 		} catch (XMLStreamException e) {
@@ -268,7 +268,7 @@ public class MpimParseInput //extends Thread
 			System.out.println(parse + "\n");
 			System.out.println("-------------------------------------------");
 			System.out.println("(DEBUG) cause: " + e.getMessage());
-			
+
 			System.out.println("===========================================");
 		} finally {
 			try {
@@ -278,11 +278,11 @@ public class MpimParseInput //extends Thread
 		}
 		System.out.println("(DEBUG) Thread " + thid + " has finished");
 	}
-	
+
 	public class Monitor
 	{
 		boolean signaled = false;
-		
+
 		public synchronized void goToSleep()
 		{
 			try {
@@ -292,11 +292,18 @@ public class MpimParseInput //extends Thread
 			}
 			signaled = true;
 		}
-		
+
 		public synchronized void wakeMePlease()
 		{
 			signaled = true;
 			this.notify();
 		}
+	}
+
+	private enum StanzaState {
+		CLEAN,
+		IQ,
+		MESSAGE,
+		PRECENSE
 	}
 }

@@ -56,7 +56,8 @@ public class MPIMMessenger extends Thread
 	
 	public void sendMessage(String to, String msg)
 	{
-		messenger.sendText(Email.parseStr(to), new String(msg));
+		
+		messenger.sendText(Email.parseStr(to), msg);
 	}
 
 	public void sendTyping(String to)

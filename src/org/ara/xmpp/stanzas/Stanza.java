@@ -24,7 +24,7 @@ public class Stanza
 		this(name, simple, true);
 	}
 	
-	public Stanza(String name, boolean simple, boolean childsTag)
+	public Stanza(String name, boolean simple, boolean allowChilds)
 	{
 		assert(name != null);
 		
@@ -32,7 +32,7 @@ public class Stanza
 		this.attributes = new ArrayList< Pair<String, String> >();
 		this.childs = new ArrayList<Stanza>();
 		this.simple = simple;
-		this.allowChild = childsTag;
+		this.allowChild = allowChilds;
 		this.text = "";
 	}
 
@@ -40,6 +40,17 @@ public class Stanza
 	{
 		assert(key != null && value != null);
 		attributes.add(new Pair<String, String>(key, value));
+	}
+	
+	public String getAttributeByName(String name) 
+	{
+		assert(name != null);
+		
+		for(Pair<String, String> attr : attributes)
+			if(attr.getFirst().equals(name))
+				return attr.getSecond();
+		
+		return null;
 	}
 	
 	public boolean addChild(Stanza stanza)
@@ -68,6 +79,28 @@ public class Stanza
 	public boolean isSimple()
 	{
 		return simple;
+	}
+	
+	public String getChildValue(String childName) throws Exception
+	{
+		assert(childName != null);
+		
+		Stanza child = null;
+		
+		for(Stanza c : childs) {
+			if(c.name.equals(childName)) {
+				child = c;
+				break;
+			}	
+		}
+		
+		if(child == null)
+			return null;
+		
+		if(child.allowChild)
+			throw new Exception("Operation not allowed on this child stanza");
+		
+		return child.text;
 	}
 	
 	public String getChilds()
