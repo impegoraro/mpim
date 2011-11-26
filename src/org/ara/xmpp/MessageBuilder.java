@@ -7,6 +7,7 @@ import net.sf.jml.MsnContact;
 import net.sf.jml.MsnGroup;
 import net.sf.jml.MsnUserStatus;
 
+import org.ara.MPIMMessenger;
 import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
 import org.ara.xmpp.stanzas.PresenceStanza;
@@ -60,7 +61,7 @@ public class MessageBuilder
 				Stanza item = new Stanza("item");
 
 				item.addAttribute("jid", cont.getEmail().toString());
-				item.addAttribute("name",cont.getEmail().toString()); //cont.getDisplayName().replaceAll("(\"|')", "_"));
+				item.addAttribute("name", MPIMMessenger.encodeHTML(cont.getDisplayName()));
 				item.addAttribute("subscription", "both");
 
 				if(cont.getBelongGroups() != null && cont.getBelongGroups().length > 0) {
