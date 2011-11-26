@@ -4,16 +4,15 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.Iterator;
 
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLEventReader;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.events.Attribute;
-import javax.xml.stream.events.Namespace;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
@@ -22,48 +21,59 @@ import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
 import org.ara.xmpp.stanzas.Stanza;
 
-public class MpimParseInput extends Thread
+public class MpimParseInput //extends Thread
 {
 	private SocketChannel sc;
 	private String parse;
 	private Proxy accounts;
-	public volatile String msg;
+	static private long thid = 0; 
 	
 	public MpimParseInput(SelectionKey key){
 		sc = (SocketChannel) key.channel();
 		accounts = (Proxy) key.attachment();
+		thid++;
 		
 		try{
 			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize());
 
-			if(sc.read(data) == -1)
-				parse = null;
-			else
+			if(sc.read(data) == -1) {
+				// Channel is closed, close the channel and remove the key from the selector 
+				accounts.close();
+			} else
 				parse = (new String(data.array())).trim();
 
 			if(parse.equals("\0") || parse.length()==0)
 				parse = null;
 			
+		} catch(ClosedChannelException e) {
+			System.out.println("(WW) Closed channel ");
+			accounts.close();
 		} catch(NullPointerException e) {
-			/*if(sc == null) {
-				System.out.println("Socket is null");
+			if(sc == null) {
+				System.out.println("(EE) Unrecoverable error: the socket is null. Ending the application");
 				System.exit(1);
-			}*/
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
-	@Override
+	//@Override
 	public void run()
 	{
-		if(parse == null)
+		System.out.println("Thread " + thid + " is running");
+		
+		if(parse == null) {
+			System.out.println("(DEBUG) Thread " + thid + " has finished without information");
 			return;
+		}
+		
+		//System.out.println("#####\n"+ parse + "\n#####");
 
 		XMLInputFactory xmlFactory = XMLInputFactory.newInstance();
 		Reader reader = new StringReader(parse);
 		XMLEventReader xmlEvents;
-		XMLEvent event;
+		XMLEvent event = null;
 
 		try {
 
@@ -82,35 +92,57 @@ public class MpimParseInput extends Thread
 
 						while(xmlEvents.hasNext()) {
 							event = xmlEvents.nextEvent();
-							String x = null;
 							String namespace;
 							
 							if(event.isStartElement()) {
 								MPIMMessenger msn = accounts.getMSN();
 								
 								if(event.asStartElement().getName().getLocalPart().equals("query")) {
-									@SuppressWarnings("unchecked")
-									Iterator<Namespace> ii= event.asStartElement().getNamespaces();
+									//@SuppressWarnings("unchecked")
+									//Iterator<Namespace> ii= event.asStartElement().getNamespaces();
 									Attribute attrNS = event.asStartElement().getAttributeByName(new QName("xmlns"));
 									
 									namespace = (attrNS != null) ? attrNS.getValue() : "";
 									
-									while(ii.hasNext()) {
+									/*while(ii.hasNext()) {
 										Namespace attr= ii.next();
-
 										String value =  attr.getValue();
 										x = value;
-									}
+									} */
 									
-									if(x.equals("jabber:iq:roster")) {
+									if(namespace.equals("jabber:iq:roster")) {
 										System.out.println("(II) Asking for roster");
 										
 										msn.sendRoster(id);
 										msn.setAllowPresence(true);
 										msn.sendContactListPresence();
 										
-									} else  {//if(namespace.equals("http://jabber.org/protocol/disco#info"))
-										System.out.println("(II) Sending Service unavailable");
+									} else if(namespace.equals("http://jabber.org/protocol/disco#info")) {
+										System.out.println("(II) Sending Service unavailable (info)");
+
+										Stanza iqresult = new IQStanza(IQType.RESULT, id);
+										Stanza query = new Stanza("query", true);
+										Stanza error = new Stanza("error");
+										Stanza notAllowd = new Stanza("service-unavailable", true);
+										error.addAttribute("type", "cancel");
+										
+										query.addAttribute("xmlns", "http://jabber.org/protocol/disco#info");
+										query.addAttribute("node", "http://jabber.org/protocol/commands");
+										iqresult.addChild(query);
+										iqresult.addChild(error);
+										notAllowd.addAttribute("xmlns" ,"urn:ietf:params:xml:ns:xmpp-stanzas");
+										error.addChild(notAllowd);
+										
+										try {
+											accounts.getConnection().write(iqresult);
+										} catch (IOException e) {
+											e.printStackTrace();
+										}
+										
+										
+									} else if(namespace.equals("http://jabber.org/protocol/disco#items")) {
+										System.out.println("(II) Sending Service unavailable (items)");
+
 										Stanza iqresult = new IQStanza(IQType.RESULT, id);
 										Stanza query = new Stanza("query", true);
 										Stanza error = new Stanza("error");
@@ -129,22 +161,26 @@ public class MpimParseInput extends Thread
 										} catch (IOException e) {
 											e.printStackTrace();
 										}
+									} else {
+										System.out.println("(WW) Unsuporrted namespace: '" + namespace+ "'");
 									}
 								}
 								
 							} else if((event.isStartElement()) && event.asStartElement().getName().getLocalPart().equals("ping")) {
+								System.out.println("(II) Sending ping reply...");
 								IQStanza pong = new IQStanza(IQType.RESULT, id);
 								try {
 									accounts.getConnection().write(pong);
 								} catch (IOException e) {
 								}
-							}else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
-								break;
+							} else if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
+								continue;
 							
 						}
 						if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("iq"))
-							break;
+							continue;
 						
+					// End of while for IQ stanzas 	
 					} else if(event.asStartElement().getName().getLocalPart().equals("presence")) {
 						String show = null, status = null;
 						boolean sh = false, st = false;
@@ -179,7 +215,7 @@ public class MpimParseInput extends Thread
 							
 							if(event.isEndElement() && event.asEndElement().getName().getLocalPart().equals("presence")){
 								accounts.getMSN().setStatus(show, status);
-								break;
+								continue;
 							}
 						}
 						
@@ -213,20 +249,34 @@ public class MpimParseInput extends Thread
 										accounts.getMSN().sendMessage(attrTo.getValue(), msg);
 									if(composing)
 										accounts.getMSN().sendTyping(attrTo.getValue());
-									break;
+									continue;
 								}
 							}
 						}
-					} 
-					/* TODO: handle the </stream:stream> ending tag */
+					} else if(event.isEndElement()) {
+						/* TODO: handle the </stream:stream> ending tag */
+						accounts.close();
+					}
 
 
 				}
 			}			
 		} catch (XMLStreamException e) {
-			e.printStackTrace();
+			//e.printStackTrace();
+			System.out.println("(EE) parsing error, the last xml was " + event);
+			System.out.println("===========================================");
+			System.out.println(parse + "\n");
+			System.out.println("-------------------------------------------");
+			System.out.println("(DEBUG) cause: " + e.getMessage());
+			
+			System.out.println("===========================================");
+		} finally {
+			try {
+				reader.close();
+			} catch (IOException e) {
+			}
 		}
-
+		System.out.println("(DEBUG) Thread " + thid + " has finished");
 	}
 	
 	public class Monitor

@@ -7,69 +7,68 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.spi.SelectorProvider;
 import java.util.Iterator;
 
 public class MPIMCore
 {
 	private final static String prog_version = "0.1-alpha";
 	private final static String prog_name = "mpim";
-	private final static String[] prog_authors = { "Ilan Pegoraro <impegoraro@ua.pt> ", "Renato Almeida <renato.almeida@ua.pt>" };
+	private final static String[] prog_authors = { 
+		"Ilan Pegoraro <impegoraro@ua.pt> ",
+		"Renato Almeida <renato.almeida@ua.pt>"
+	};
 	private volatile Selector selector;
 	private ServerSocketChannel sChan;
 
-	
 	ConnectionState state;
-	
-	public MPIMCore()
+
+	public MPIMCore(int port)
 	{
-		//super("MPIM_Core");
 		try {
-			selector = Selector.open();
+			InetSocketAddress iaddr = new InetSocketAddress(InetAddress.getByName("0.0.0.0"), port);
+
+			selector = SelectorProvider.provider().openSelector();
+
 			sChan = ServerSocketChannel.open();
-			InetAddress addr = InetAddress.getByName("0.0.0.0");
-			InetSocketAddress iaddr = new InetSocketAddress(addr, 5222);
 			sChan.configureBlocking(false);
 			sChan.socket().bind(iaddr);
 			sChan.register(selector, SelectionKey.OP_ACCEPT);
-			//sockets = new LinkedList<SocketChannel>();
-		} catch (IOException e) {
-		}
 
-		//this.start();
+		} catch (IOException e) {
+			System.err.println("(EE) unable to set up server. Ending the application");
+			System.exit(1);
+		}
 	}
 
 	public final String getVersion()
 	{
 		return prog_version;
 	}
-	
+
 	public final String getProgName()
 	{
 		return prog_name;
 	}
-	
+
 	public final String[] getAuthors()
 	{
 		return prog_authors;
 	}
-	
+
 	public void run()
 	{
-		Iterator<SelectionKey> it;
-		
+		Iterator<SelectionKey> selectedKeys;
+
 		try {
 			while(true) {
 				selector.select();
 
-				it = selector.selectedKeys().iterator();
-				while(it.hasNext()) {
-					SelectionKey key = (SelectionKey) it.next();
+				selectedKeys = selector.selectedKeys().iterator();
+				while(selectedKeys.hasNext()) {
+					SelectionKey key = (SelectionKey) selectedKeys.next();
+					selectedKeys.remove();
 
-					it.remove();
-					if(key == null) {
-						System.out.println("Got a null key");
-						System.exit(1);
-					}
 					if(!key.isValid()) {
 						continue;
 					}
@@ -77,21 +76,22 @@ public class MPIMCore
 					// Finish connection in case of an error 
 					if(key.isConnectable()) {
 						SocketChannel ssc = (SocketChannel) key.channel();
+
 						if(ssc.isConnectionPending())
 							ssc.finishConnect();
-					}
 
-					// Incoming connection, proceed with procedure to add the peer's socket to the list
-					if(key.isAcceptable()) { 
+					} else if(key.isAcceptable()) { 
+						// Incoming connection, proceed with procedure to add the peer's socket to the list
+
 						ServerSocketChannel ssc = (ServerSocketChannel) key.channel();
 						SocketChannel newClient = ssc.accept();
-						System.out.println("(II) Accepted incomming connection form " + ssc.socket().getInetAddress().getCanonicalHostName());
-						
+
+						System.out.println("(II) Accepted incomming connection form " + newClient.socket().getInetAddress().getHostAddress());
+
 						MpimAuthenticate auth = new MpimAuthenticate(selector,  newClient);
 						auth.run();
-					}
 
-					if(key.isReadable()) {
+					} else if(key.isReadable()) {
 						MpimParseInput mpi = new MpimParseInput(key);
 						mpi.run();
 					}
@@ -101,11 +101,11 @@ public class MPIMCore
 			e.printStackTrace();
 		}
 	}
-	
+
 	public static void main(String args[])
 	{
-		MPIMCore mpim = new MPIMCore();
-		
+		MPIMCore mpim = new MPIMCore(5222);
+
 		if(args.length > 0){
 			if(args[0].equals("-v") || args[0].equals("--version")) {
 				System.out.println(mpim.getProgName() + " v" + mpim.getVersion() + " A simple XMPP proxy to other proprietary instant messaging protocol.");
@@ -119,9 +119,9 @@ public class MPIMCore
 				System.out.println("\n\n");
 				System.exit(0);
 			}
-				
+
 		}
-		
+
 		System.out.println("(II) Mpim server has been initialized");
 		System.out.println("(II) Waiting for connections...");
 		mpim.run();
