@@ -1,12 +1,12 @@
 package org.ara.xmpp;
 
 import java.io.IOException;
-import java.io.StringWriter;
 
 import net.sf.jml.MsnContact;
 import net.sf.jml.MsnGroup;
 import net.sf.jml.MsnUserStatus;
 
+import org.ara.MPIMMessenger;
 import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
 import org.ara.xmpp.stanzas.PresenceStanza;
@@ -15,36 +15,6 @@ import org.ara.xmpp.stanzas.Stanza;
 public class MessageBuilder
 {
 	static int roster_ver = 0;
-	
-	@Deprecated
-	public static String buildRoster(String id, String email, MsnContact[] contacts)
-	{
-		StringWriter sw = new StringWriter();
-		String displayName;
-		
-		sw.append("<iq id='" + id + "' to='" + email + "' type='result' ver='ver15'>\n");
-
-		sw.append("  <query xmlns='jabber:iq:roster'>\n");
-
-		for(MsnContact cont : contacts) {
-			displayName = cont.getDisplayName().replaceAll("[\"<>']", "_");
-			sw.append("    <item jid='" + cont.getEmail().toString() + "' name='" +  displayName 
-					+ "' subscription='both'");
-			if(cont.getBelongGroups() != null && cont.getBelongGroups().length > 0) {
-				sw.append(">\n");
-				for(MsnGroup grp : cont.getBelongGroups()) {
-					sw.append("      <group>" + grp.getGroupName() + "</group>\n");
-				}
-				sw.append("    </item>\n");
-			} else {
-				sw.append("/>\n");
-			}
-		}
-		sw.append("  </query>\n");
-		sw.append("</iq>");
-
-		return sw.toString();
-	}
 
 	public static void sendRoster(XMPPConnection out, String id, String email, MsnContact[] contacts)
 	{
@@ -61,7 +31,7 @@ public class MessageBuilder
 		try {
 			for(MsnContact cont : contacts) {
 				Stanza item = new Stanza("item");
-				displayName = cont.getDisplayName().replaceAll("[\"<>']", "_");
+				displayName = MPIMMessenger.encodeHTML(cont.getDisplayName());
 				item.addAttribute("jid", cont.getEmail().toString());
 				item.addAttribute("name", displayName);
 				item.addAttribute("subscription", "both");
@@ -84,37 +54,6 @@ public class MessageBuilder
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
-
-	@Deprecated
-	public static String bluildContactPresence(String email, MsnContact contact){
-		boolean added = false;
-		String toSend = "<presence from=\""+contact.getEmail().getEmailAddress()+"\" to=\""+email+"\"";
-
-		if(contact.getStatus() == MsnUserStatus.AWAY || contact.getStatus() == MsnUserStatus.BE_RIGHT_BACK || contact.getStatus() == MsnUserStatus.IDLE || contact.getStatus() == MsnUserStatus.OUT_TO_LUNCH){
-			toSend += "> \n<show>away</show>";
-			added = true;
-		}
-		if(contact.getStatus() == MsnUserStatus.BUSY || contact.getStatus() == MsnUserStatus.OUT_TO_LUNCH){
-			toSend += "> \n<show>dnd</show>";
-			added = true;
-		}
-		if(contact.getStatus() == MsnUserStatus.OFFLINE && contact.getOldStatus() != MsnUserStatus.OFFLINE)
-			toSend += "type=\"unavailable\"";
-
-
-		if(contact.getPersonalMessage() != null && contact.getPersonalMessage().length() > 0 ){
-			if(!added)
-				toSend +=">";
-			added = true;
-			toSend += "\n<status>"+contact.getPersonalMessage()+"</status>";
-		}
-		if(!added)
-			toSend += "/>";
-		else
-			toSend += "\n</presence>";
-
-		return toSend;
 	}
 	
 	public static PresenceStanza bluildContactPresenceStanza(String email, MsnContact contact){
