@@ -94,6 +94,23 @@ public class MPIMMessenger extends Thread
 		}
 	}
 	
+	public void setStatus(String show, String status, String nick){
+		MsnOwner own = messenger.getOwner();
+		
+		if(show == null || show.equals("chat"))
+			own.setStatus(MsnUserStatus.ONLINE);
+		else if(show.equals("away") || show.equals("xa"))
+			own.setStatus(MsnUserStatus.AWAY);
+		else if(show.equals("dnd"))
+			own.setStatus(MsnUserStatus.BUSY);
+		
+		if(status == null)
+			status = "";
+		if(nick != null)
+			own.setDisplayName(nick);
+		own.setPersonalMessage(status);
+	}
+	
 	public void setStatus(String show, String status){
 		MsnOwner own = messenger.getOwner();
 		

@@ -4,7 +4,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.Calendar;
+import java.util.Random;
 
+import org.ara.xmpp.stanzas.IQStanza;
+import org.ara.xmpp.stanzas.IQStanza.IQType;
 import org.ara.xmpp.stanzas.Stanza;
 
 public class XMPPConnection 
@@ -55,5 +59,28 @@ public class XMPPConnection
 		} catch(NullPointerException e) {
 			
 		}
+	}
+	
+	public synchronized void sendPing()
+	{
+		Random r = new Random();
+		IQStanza stanza;
+		Stanza ping;
+		
+		r.setSeed(Calendar.getInstance().getTimeInMillis());
+		stanza = new IQStanza(IQType.GET, "mpim" + r.nextInt());
+		
+		ping  = new Stanza("ping", true);
+		ping.addAttribute("xmlns", "urn:xmpp:ping");
+		stanza.addChild(ping);
+		stanza.addAttribute("from", entity.getDomain());
+		stanza.addAttribute("to", entity.getJID());
+		
+		try {
+			socket.write(ByteBuffer.wrap(stanza.getStanza().getBytes()));
+		} catch (IOException e) {
+			
+		}
+
 	}
 }

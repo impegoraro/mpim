@@ -7,12 +7,14 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.Iterator;
 
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLEventReader;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.events.Attribute;
+import javax.xml.stream.events.Namespace;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
@@ -92,23 +94,21 @@ public class MpimParseInput //extends Thread
 
 						while(xmlEvents.hasNext()) {
 							event = xmlEvents.nextEvent();
-							String namespace;
+							String namespace = "";
 							
 							if(event.isStartElement()) {
 								MPIMMessenger msn = accounts.getMSN();
 								
 								if(event.asStartElement().getName().getLocalPart().equals("query")) {
-									//@SuppressWarnings("unchecked")
-									//Iterator<Namespace> ii= event.asStartElement().getNamespaces();
+									@SuppressWarnings("unchecked")
+									Iterator<Namespace> ii= event.asStartElement().getNamespaces();
 									Attribute attrNS = event.asStartElement().getAttributeByName(new QName("xmlns"));
 									
-									namespace = (attrNS != null) ? attrNS.getValue() : "";
-									
-									/*while(ii.hasNext()) {
+									while(ii.hasNext()) {
 										Namespace attr= ii.next();
 										String value =  attr.getValue();
-										x = value;
-									} */
+										namespace = value;
+									}
 									
 									if(namespace.equals("jabber:iq:roster")) {
 										System.out.println("(II) Asking for roster");
