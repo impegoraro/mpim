@@ -34,15 +34,16 @@ public class MpimParseInput //extends Thread
 		sc = (SocketChannel) key.channel();
 		accounts = (Proxy) key.attachment();
 		thid++;
-		
+		String tmp = "<stream>";
+		String tmpEnd = "</stream>";
 		try{
-			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize());
+			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize() + tmp.length() + tmpEnd.length());
 
 			if(sc.read(data) == -1) {
 				// Channel is closed, close the channel and remove the key from the selector 
 				accounts.close();
 			} else
-				parse = (new String(data.array())).trim();
+				parse = tmp +(new String(data.array())).trim() + tmpEnd;
 
 			if(parse.equals("\0") || parse.length()==0)
 				parse = null;
@@ -263,13 +264,13 @@ public class MpimParseInput //extends Thread
 			}			
 		} catch (XMLStreamException e) {
 			//e.printStackTrace();
-			System.out.println("(EE) parsing error, the last xml was " + event);
-			System.out.println("===========================================");
-			System.out.println(parse + "\n");
-			System.out.println("-------------------------------------------");
-			System.out.println("(DEBUG) cause: " + e.getMessage());
+			System.err.println("(EE) parsing error, the last xml was " + event);
+			System.err.println("===========================================");
+			System.err.println(parse + "\n");
+			System.err.println("-------------------------------------------");
+			System.err.println("(DEBUG) cause: " + e.getMessage());
 			
-			System.out.println("===========================================");
+			System.err.println("===========================================");
 		} finally {
 			try {
 				reader.close();

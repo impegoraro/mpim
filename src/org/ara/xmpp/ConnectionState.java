@@ -3,6 +3,7 @@ package org.ara.xmpp;
 public enum ConnectionState {
 	DISCONNECTED,
 	CONNECTED,
+	STARTTLS,
 	AUTHENTICATING,
 	AUTHENTICATED,
 	NONAUTHENTICATED
