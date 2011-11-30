@@ -27,26 +27,27 @@ import org.ara.xmpp.stanzas.Stanza;
 
 public class MpimParseInput //extends Thread
 {
-	static private long thid = 0; 
 	private SocketChannel sc;
 	private String parse;
 	private Proxy accounts;
 	private StanzaState state;
 
 	public MpimParseInput(SelectionKey key){
+		String inicial ="<stream>";
+		String end = "</stream>";
 		sc = (SocketChannel) key.channel();
 		accounts = (Proxy) key.attachment();
-		thid++;
 		state = StanzaState.CLEAN;
-
+		
 		try{
-			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize());
+			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize() + inicial.length() + end.length());
 
 			if(sc.read(data) == -1) {
-				// Channel is closed, close the channel and remove the key from the selector 
+				// Channel is closed, close the channel and remove the key from the selector
+				key.cancel();
 				accounts.close();
 			} else
-				parse = (new String(data.array())).trim();
+				parse = inicial + (new String(data.array())).trim() + end;
 
 			if(parse.equals("\0") || parse.length()==0)
 				parse = null;
@@ -60,7 +61,6 @@ public class MpimParseInput //extends Thread
 				System.out.println("(EE) Unrecoverable error: the socket is null. Ending the application");
 				System.exit(1);
 			}
-
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -72,10 +72,10 @@ public class MpimParseInput //extends Thread
 		String id = "";
 		Stanza stanza = null;
 		
-		System.out.println("Thread " + thid + " is running");
+		//System.out.println("Thread " + thid + " is running");
 
 		if(parse == null) {
-			System.out.println("(DEBUG) Thread " + thid + " has finished without information");
+			/* there's nothing to parse */
 			return;
 		}
 
@@ -99,6 +99,7 @@ public class MpimParseInput //extends Thread
 
 						if(evTmp.getName().getLocalPart().equals("iq")) {	
 							id = evTmp.getAttributeByName(new QName("id")).getValue();
+							//stanza = new IQStanza(type, id)
 							state = StanzaState.IQ;
 							
 						} else if(evTmp.getName().getLocalPart().equals("presence")) {
@@ -108,9 +109,8 @@ public class MpimParseInput //extends Thread
 							
 						} else if(evTmp.getName().getLocalPart().equals("message")) {
 							Attribute attrTo = event.asStartElement().getAttributeByName(new QName("to"));
-							
-							stanza = new MessageChatStanza(null, attrTo.getValue());
 
+							stanza = new MessageChatStanza(null, attrTo.getValue());
 							state = StanzaState.MESSAGE;
 						}
 					}
@@ -227,12 +227,10 @@ public class MpimParseInput //extends Thread
 					}
 					
 				} else if(state == StanzaState.MESSAGE) {
-					
 					if(event.isStartElement()) {
 						if(event.asStartElement().getName().getLocalPart().equals("body")) {
 							String msg; 
 							
-							xmlEvents.next();
 							event = xmlEvents.nextEvent();
 							msg = event.asCharacters().getData();
 							((MessageChatStanza) stanza).setBody(msg);
@@ -248,11 +246,7 @@ public class MpimParseInput //extends Thread
 									msg = stanza.getChildValue("body");
 								} catch (Exception e) {
 								}
-								
-								if(msg != null && stanza.getAttributeByName("to") != null)
-									accounts.getMSN().sendMessage(stanza.getAttributeByName("to"), msg);
-								else 
-									System.err.println("(DEBUG) The message is " + msg + "and the to attribute is "+ stanza.getAttributeByName("to"));
+								accounts.getMSN().sendMessage(stanza.getAttributeByName("to"), msg);
 							}
 
 							state = StanzaState.CLEAN;
@@ -262,7 +256,6 @@ public class MpimParseInput //extends Thread
 				}
 			}			
 		} catch (XMLStreamException e) {
-			//e.printStackTrace();
 			System.out.println("(EE) parsing error, the last xml was " + event);
 			System.out.println("===========================================");
 			System.out.println(parse + "\n");
@@ -276,7 +269,7 @@ public class MpimParseInput //extends Thread
 			} catch (IOException e) {
 			}
 		}
-		System.out.println("(DEBUG) Thread " + thid + " has finished");
+
 	}
 
 	public class Monitor
