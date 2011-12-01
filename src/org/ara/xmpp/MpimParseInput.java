@@ -22,6 +22,7 @@ import org.ara.MPIMMessenger;
 import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
 import org.ara.xmpp.stanzas.MessageChatStanza;
+import org.ara.xmpp.stanzas.MessageStanza;
 import org.ara.xmpp.stanzas.PresenceStanza;
 import org.ara.xmpp.stanzas.Stanza;
 
@@ -92,14 +93,27 @@ public class MpimParseInput //extends Thread
 				event = xmlEvents.nextEvent();
 				String namespace;
 
-				if(state == StanzaState.CLEAN) {
+				if(stanza == null) {
 
 					if(event.isStartElement()) {
 						StartElement evTmp = event.asStartElement();
 
 						if(evTmp.getName().getLocalPart().equals("iq")) {	
+							IQType type;
+							
 							id = evTmp.getAttributeByName(new QName("id")).getValue();
-							//stanza = new IQStanza(type, id)
+							Attribute attrType  = evTmp.getAttributeByName(new QName("type"));
+							if(attrType == null) {
+								/* TODO: return an error bad stanza*/
+								break;
+							}
+							
+							if(attrType.getValue().equals("set"))
+								type = IQType.SET;
+							else 
+								type = IQType.GET;
+							
+							stanza = new IQStanza(type, id);
 							state = StanzaState.IQ;
 							
 						} else if(evTmp.getName().getLocalPart().equals("presence")) {
@@ -115,7 +129,8 @@ public class MpimParseInput //extends Thread
 						}
 					}
 
-				} else if (state == StanzaState.IQ) {
+				//} else if (state == StanzaState.IQ) {
+				} else if (stanza instanceof IQStanza) {
 					if(event.isStartElement()) {
 						if(event.asStartElement().getName().getLocalPart().equals("query")) {
 							MPIMMessenger msn = accounts.getMSN();
@@ -196,7 +211,8 @@ public class MpimParseInput //extends Thread
 						stanza = null;
 					}
 
-				} else if(state == StanzaState.PRECENSE) {
+				//} else if(state == StanzaState.PRECENSE) {
+				} else if(stanza instanceof  PresenceStanza) {
 				
 					if(event.isStartElement()) {						
 						if(event.asStartElement().getName().getLocalPart().equals("show") || 
@@ -226,10 +242,11 @@ public class MpimParseInput //extends Thread
 						}
 					}
 					
-				} else if(state == StanzaState.MESSAGE) {
+				//} else if(state == StanzaState.MESSAGE) {
+				} else if(stanza instanceof MessageStanza) {
 					if(event.isStartElement()) {
 						if(event.asStartElement().getName().getLocalPart().equals("body")) {
-							String msg; 
+							String msg;
 							
 							event = xmlEvents.nextEvent();
 							msg = event.asCharacters().getData();

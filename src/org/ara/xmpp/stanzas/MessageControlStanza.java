@@ -1,6 +1,6 @@
 package org.ara.xmpp.stanzas;
 
-public class MessageControlStanza extends Stanza
+public class MessageControlStanza extends MessageStanza
 {
 
 	public MessageControlStanza(String from, String to) 

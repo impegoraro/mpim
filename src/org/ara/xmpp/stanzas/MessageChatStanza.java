@@ -1,8 +1,9 @@
 package org.ara.xmpp.stanzas;
 
-public class MessageChatStanza  extends Stanza
+public class MessageChatStanza  extends MessageStanza
 {
 	private Stanza body; 
+	
 	public MessageChatStanza(String from, String to, String body)
 	{
 		this(from, to);
