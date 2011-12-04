@@ -8,10 +8,10 @@ public class ErrorIQStanza extends IQStanza
 	}
 	
 	@Override
-	public boolean addChild(Stanza stanza)
+	public Stanza addChild(Stanza stanza)
 	{
 		if(childs.size() == 1)
-			return false;
+			return null;
 		else
 			return super.addChild(stanza);
 	}

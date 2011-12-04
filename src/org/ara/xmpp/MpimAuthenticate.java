@@ -123,9 +123,9 @@ public class MpimAuthenticate extends Thread
 							/*TODO: Should check if the type is right */
 							
 						} else if(element.getName().getLocalPart().equals("query")) {
-							//Attribute attr = element.getAttributeByName(new QName("xmlns"));
-							String value = "";
+							@SuppressWarnings("unchecked")
 							Iterator<Namespace> ii = event.asStartElement().getNamespaces();
+							String value = "";
 
 							while(ii.hasNext()) {
 								Namespace attr= ii.next();
@@ -148,7 +148,7 @@ public class MpimAuthenticate extends Thread
 							}
 							if(value.equals("jabber:iq:auth"))
 								state = ConnectionState.AUTHENTICATING;
-							else // wrong namespace for the iq stanza
+							else // TODO: wrong namespace for the iq stanza, send error message and close the stream
 								break;
 							
 

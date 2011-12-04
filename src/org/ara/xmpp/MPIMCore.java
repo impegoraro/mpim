@@ -13,7 +13,7 @@ import java.util.Iterator;
 
 public class MPIMCore
 {
-	private final static String prog_version = "0.1-alpha";
+	private final static String prog_version = "0.5";
 	private final static String prog_name = "mpim";
 	private final static String[] prog_authors = { 
 		"Ilan Pegoraro <impegoraro@ua.pt> ",
@@ -42,17 +42,17 @@ public class MPIMCore
 		}
 	}
 
-	public final String getVersion()
+	public static final String getVersion()
 	{
 		return prog_version;
 	}
 
-	public final String getProgName()
+	public static final String getProgName()
 	{
 		return prog_name;
 	}
 
-	public final String[] getAuthors()
+	public static final String[] getAuthors()
 	{
 		return prog_authors;
 	}
