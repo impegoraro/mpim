@@ -324,7 +324,6 @@ public class MPIMMessenger extends Thread
 	private class DisplayImageRetriever implements DisplayPictureListener
 	{
 		private MPIMMessenger handle;
-		public MsnObject msnObject;
 		public byte[] picture;
 
 		public DisplayImageRetriever(MPIMMessenger handle)

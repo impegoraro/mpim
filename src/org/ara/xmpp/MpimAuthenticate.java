@@ -10,6 +10,7 @@ import java.util.Calendar;
 import java.util.Iterator;
 import java.util.Random;
 
+import javax.net.ssl.SSLSocket;
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLEventReader;
 import javax.xml.stream.XMLInputFactory;
@@ -30,7 +31,8 @@ public class MpimAuthenticate extends Thread
 	String domain;
 	ConnectionState state;
 	Stanza stream;
-
+	SSLSocket sslsocket;
+	
 	public MpimAuthenticate(Selector pool, SocketChannel socket)
 	{
 		this.sc = socket;

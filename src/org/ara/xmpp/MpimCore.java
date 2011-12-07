@@ -11,7 +11,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Iterator;
 
-public class MPIMCore
+public class MpimCore
 {
 	private final static String prog_version = "0.5";
 	private final static String prog_name = "mpim";
@@ -24,7 +24,7 @@ public class MPIMCore
 
 	ConnectionState state;
 
-	public MPIMCore(int port)
+	public MpimCore(int port)
 	{
 		try {
 			InetSocketAddress iaddr = new InetSocketAddress(InetAddress.getByName("0.0.0.0"), port);
@@ -105,12 +105,12 @@ public class MPIMCore
 
 	public static void main(String args[])
 	{
-		MPIMCore mpim = new MPIMCore(5222);
+		MpimCore mpim = new MpimCore(5222);
 
 		if(args.length > 0){
 			if(args[0].equals("-v") || args[0].equals("--version")) {
-				System.out.println(mpim.getProgName() + " v" + mpim.getVersion() + " A simple XMPP proxy to other proprietary instant messaging protocol.");
-				for(String author : mpim.getAuthors()) {
+				System.out.println(MpimCore.getProgName() + " v" + MpimCore.getVersion() + " A simple XMPP proxy to other proprietary instant messaging protocol.");
+				for(String author : MpimCore.getAuthors()) {
 					System.out.println(author);
 				}
 				System.out.println("\nCopyright (C) 2011 Universidade de Aveiro\n" +

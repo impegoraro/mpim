@@ -2,7 +2,7 @@ package org.ara.xmpp;
 
 import net.sf.jml.MsnUserStatus;
 
-public class MPIMContact
+public class MpimContact
 {
 	public String email;
 	public String password;
