@@ -10,6 +10,7 @@ import java.util.Calendar;
 import java.util.Iterator;
 import java.util.Random;
 
+import javax.net.ssl.SSLSocket;
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLEventReader;
 import javax.xml.stream.XMLInputFactory;
@@ -25,23 +26,17 @@ import org.ara.xmpp.stanzas.Stanza;
 
 public class MpimAuthenticate extends Thread
 {
-	private SocketChannel sc;
-	private Selector pool;
-	private String domain;
-	private ConnectionState state;
-	private Stanza stream;
-	private boolean shouldUseTLS;
+	SocketChannel sc;
+	Selector pool;
+	String domain;
+	ConnectionState state;
+	Stanza stream;
+	SSLSocket sslsocket;
 	
 	public MpimAuthenticate(Selector pool, SocketChannel socket)
 	{
-		this(pool, socket, false);
-	}
-	
-	public MpimAuthenticate(Selector pool, SocketChannel socket, boolean useTLS)
-	{
 		this.sc = socket;
 		this.pool = pool;
-		this.shouldUseTLS = useTLS;
 		domain = null;
 		state = ConnectionState.DISCONNECTED;
 		stream = new Stanza("stream:stream");
@@ -57,7 +52,7 @@ public class MpimAuthenticate extends Thread
 	{
 		XMLInputFactory xmlFactory = XMLInputFactory.newInstance();
 		XMLEventReader xmlEvents;
-		XMLEvent event = null;
+		XMLEvent event;
 		String iq_id = "";
 		String iq_type = null;
 		String username = null;
@@ -91,20 +86,9 @@ public class MpimAuthenticate extends Thread
 							
 							stream.addAttribute("to", domain);
 							stream.addAttribute("id", "" + r.nextLong());
-							if(shouldUseTLS) {
-								Stanza features = new Stanza("stream:features");
-								Stanza tls = new Stanza("starttls");
-								tls.addAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-tls");
-								tls.addChild(new Stanza("required", true));
-								features.addChild(tls);
-								stream.addChild(features);
-								state = ConnectionState.STARTTLS;
-							} else {
-								stream.addChild(new Stanza("stream:features", true));
-								state = ConnectionState.AUTHENTICATING;
-							}
-							
-							sc.write(ByteBuffer.wrap(("<?xml version='1.0' encoding='UTF-8' ?>").getBytes()));
+							stream.addChild(new Stanza("stream:features", true));
+
+							sc.write(ByteBuffer.wrap(("<?xml version='1.0' ?>").getBytes()));
 							sc.write(ByteBuffer.wrap((stream.startTag() + stream.getChilds()).getBytes()));
 
 							if(!version.equals("1.0")) {
@@ -112,7 +96,7 @@ public class MpimAuthenticate extends Thread
 								
 							}
 
-							
+							state = ConnectionState.AUTHENTICATING;
 						} else {
 							Stanza error = new Stanza("stream:error");
 							Stanza echild = new Stanza("invalid-xml", true);
@@ -141,9 +125,9 @@ public class MpimAuthenticate extends Thread
 							/*TODO: Should check if the type is right */
 							
 						} else if(element.getName().getLocalPart().equals("query")) {
-							//Attribute attr = element.getAttributeByName(new QName("xmlns"));
-							String value = "";
+							@SuppressWarnings("unchecked")
 							Iterator<Namespace> ii = event.asStartElement().getNamespaces();
+							String value = "";
 
 							while(ii.hasNext()) {
 								Namespace attr= ii.next();
@@ -166,7 +150,7 @@ public class MpimAuthenticate extends Thread
 							}
 							if(value.equals("jabber:iq:auth"))
 								state = ConnectionState.AUTHENTICATING;
-							else // wrong namespace for the iq stanza
+							else // TODO: wrong namespace for the iq stanza, send error message and close the stream
 								break;
 							
 
@@ -268,31 +252,12 @@ public class MpimAuthenticate extends Thread
 
 							}
 						}
-					}					
-				// End of AUTHENTICATING 
-				} else if(state == ConnectionState.STARTTLS) {
-					if(event.isStartElement()) {
-						
-						if(event.asStartElement().getName().getLocalPart().equals("starttls")) {
-							/* TODO: Check for the valid namespace */
-							Stanza proceed = new Stanza("proceed", true);
-							proceed.addAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-tls");
-							
-							sc.write(ByteBuffer.wrap(proceed.getStanza().getBytes()));
-						}
 					}
-				}
+				} 
 			}
 
 		} catch (XMLStreamException e) {
-			//e.printStackTrace();
-			System.err.println("(EE) parsing error, the last xml was " + event);
-			System.err.println("===========================================");
-			//System.out.println(+ "\n");
-			System.err.println("-------------------------------------------");
-			System.err.println("(DEBUG) cause: " + e.getMessage());
-			
-			System.err.println("===========================================");
+			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

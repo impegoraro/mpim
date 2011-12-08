@@ -19,4 +19,14 @@ public class IQStanza extends Stanza
 		addAttribute("id", id);
 		
 	}
+	
+	public IQStanza(IQType type, String id, boolean simple)
+	{
+		super("iq", simple, true);
+		
+		assert(id != null);
+		addAttribute("type", type.toString().toLowerCase());
+		addAttribute("id", id);
+		
+	}
 }

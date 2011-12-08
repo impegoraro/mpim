@@ -11,7 +11,7 @@ public class Stanza
 	List<Pair< String,String> > attributes;
 	List<Stanza> childs;
 	boolean simple;     // True is the inicial tag is also the close tag, e.g. <foobar/> 
-	boolean allowChild; // True if allows child stanzas otherwise false, allows to use string instead
+	boolean allowChilds; // True if allows child stanzas otherwise false, allows to use string instead
 	String text;
 	
 	public Stanza(String name)
@@ -24,7 +24,7 @@ public class Stanza
 		this(name, simple, true);
 	}
 	
-	public Stanza(String name, boolean simple, boolean childsTag)
+	public Stanza(String name, boolean simple, boolean allowChilds)
 	{
 		assert(name != null);
 		
@@ -32,25 +32,62 @@ public class Stanza
 		this.attributes = new ArrayList< Pair<String, String> >();
 		this.childs = new ArrayList<Stanza>();
 		this.simple = simple;
-		this.allowChild = childsTag;
+		this.allowChilds = allowChilds;
 		this.text = "";
 	}
 
-	public void addAttribute(String key, String value)
+	public Stanza addAttribute(String key, String value)
 	{
 		assert(key != null && value != null);
 		attributes.add(new Pair<String, String>(key, value));
+		
+		return this;
+	}
+
+	public Stanza setNamespace(String namespace)
+	{
+		assert(namespace != null);
+		Pair<String, String> p = getAttributeByName("xmlns");
+		
+		if(p == null) {
+			p = new Pair<String, String>("xmlns", namespace);
+		} else 
+			p.setSecond(namespace);
+		
+		return this;
 	}
 	
-	public boolean addChild(Stanza stanza)
+	public String getAttributeValueByName(String name) 
+	{
+		assert(name != null);
+		
+		for(Pair<String, String> attr : attributes)
+			if(attr.getFirst().equals(name))
+				return attr.getSecond();
+		
+		return null;
+	}
+	
+	public Stanza getChildByName(String name) 
+	{
+		assert(name != null);
+		
+		for(Stanza stanza : childs)
+			if(stanza.name.equals(name))
+				return stanza;
+		
+		return null;
+	}
+	
+	public Stanza addChild(Stanza stanza)
 	{
 		assert(stanza!= null);
 		
-		if(!allowChild)
-			return false;
+		if(!allowChilds)
+			return null;
 		
 		childs.add(stanza);
-		return true;
+		return this;
 	}
 	
 	public String startTag()
@@ -70,6 +107,28 @@ public class Stanza
 		return simple;
 	}
 	
+	public String getChildValue(String childName) throws Exception
+	{
+		assert(childName != null);
+		
+		Stanza child = null;
+		
+		for(Stanza c : childs) {
+			if(c.name.equals(childName)) {
+				child = c;
+				break;
+			}	
+		}
+		
+		if(child == null)
+			return null;
+		
+		if(child.allowChilds)
+			throw new Exception("Operation not allowed on this child stanza");
+		
+		return child.text;
+	}
+	
 	public String getChilds()
 	{
 		return getChilds(false);
@@ -84,36 +143,60 @@ public class Stanza
 	
 	public String getStanza()
 	{
-		return startTag() + getChilds() + (isSimple() ? "" : endTag());
+		return startTag() + getChilds() + endTag();
 	}
 	
 	@Override
 	public String toString()
 	{
-		return startTag() + "\n" + getChilds(true) + "\n" + endTag(); 
+		return startTag() + getChilds(true) + endTag(); 
 	}
 	
-	public boolean setText(String text)
+	public Stanza setText(String text)
 	{
-		if(allowChild)
-			return false;
+		if(allowChilds)
+			return null;
 		
 		this.text = text;
-		return true;
+		return this;
 	}
 	
+	/* Dangerous method, use it if you know what you're doing */
+	protected Stanza clearAll(boolean simple, boolean allowChilds)
+	{
+		attributes = null;
+		childs = null;
+		text = null;
+		this.simple = simple;
+		this.allowChilds = allowChilds;
+		
+		return this;
+	}
+	
+	protected Pair<String, String> getAttributeByName(String name) 
+	{
+		assert(name != null);
+		
+		for(Pair<String, String> attr : attributes)
+			if(attr.getFirst().equals(name))
+				return attr;
+		
+		return null;
+	}
+
 	private String getChilds(boolean newline)
 	{
 		String stanza = "";
 		
-		if(!allowChild)
+		if(!allowChilds)
 			stanza = (text == null)? "" : text;
 		else {
 			for(Stanza c : childs) {
-				stanza += c.startTag() + (newline ? "\n" : "") + c.getChilds(newline) + (c.isSimple() ? "" : c.endTag());
+				stanza += (newline ? "\n" : "") + c.startTag() +  c.getChilds(false) + (c.isSimple() ? "" : c.endTag());
 			}
 		}
 		
+		stanza += (newline ? "\n" : "");
 		return stanza;
 	}
 }

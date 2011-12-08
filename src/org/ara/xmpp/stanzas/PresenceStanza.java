@@ -28,10 +28,11 @@ public class PresenceStanza extends Stanza
 	{
 		super("presence");
 		
-		assert(from != null && to != null);
+		assert(from != null);
 		
 		addAttribute("from", from);
-		addAttribute("to", to);
+		if(to != null) 
+			addAttribute("to", to);
 		
 	}
 	
@@ -55,5 +56,44 @@ public class PresenceStanza extends Stanza
 		sshow.setText(show);
 		
 		addChild(sshow);
+	}
+	
+	public void setAvatar(String strsha1)
+	{
+		assert(strsha1 != null);
+		
+		Stanza avatar;
+		Stanza sha1;
+		
+		avatar = getChildByName("x");
+		if(avatar == null) {
+			avatar = new Stanza("x").addAttribute("xmlns", "vcard-temp:x:update");
+			sha1 = new Stanza("photo", false, false);
+			avatar.addChild(sha1);
+			
+			addChild(avatar);
+		} else {
+			sha1 = getChildByName("x").getChildByName("photo");
+		}
+		
+		sha1.setText(strsha1);
+	}
+	
+	public void setNoAvatar()
+	{		
+		Stanza avatar;
+		Stanza sha1;
+		
+		avatar = getChildByName("x");
+		if(avatar == null) {
+			avatar = new Stanza("x").addAttribute("xmlns", "vcard-temp:x:update");
+			sha1 = new Stanza("photo", true, false);
+			avatar.addChild(sha1);
+			
+			addChild(avatar);
+		} else {
+			sha1 = getChildByName("x").getChildByName("photo").clearAll(true, false);
+		}
+		
 	}
 }
