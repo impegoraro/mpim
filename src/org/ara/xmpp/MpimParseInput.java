@@ -52,7 +52,8 @@ public class MpimParseInput
 				key.cancel();
 				accounts.close();
 			} else {
-				parse = inicial + (new String(data.array())).trim() + end;
+				
+					parse = inicial + (new String(data.array())).trim() + end;
 			}
 
 			if(parse.equals("\0") || parse.length()==0)
@@ -240,64 +241,38 @@ public class MpimParseInput
 								/* Build and send VCard */
 								String to = stanza.getAttributeValueByName("to");
 								LegacyNetwork handle = accounts.getHandle();
-								LegacyContact contact = handle.getContact(to);
+								Stanza iqresult = new IQStanza(IQType.RESULT, stanza.getAttributeValueByName("id"));
+								VCard vcard;
+								iqresult.addAttribute("from", to);
 								
-								/*
-								Stanza iqvcard = new IQStanza(IQType.RESULT, stanza.getAttributeValueByName("id"));;
-								String to = stanza.getAttributeValueByName("to");
-
-								VCard vcard = accounts.getMSN().createVCard(to);
-								iqvcard.addAttribute("from", to);
-								
-								if(vcard != null)
-									iqvcard.addChild(vcard);
-								else 
-									System.err.println("(EE) failed to create a vcard for user '" + to+ "'");
-								
-								try {
-									accounts.getConnection().write(iqvcard);
-								} catch (IOException e) {
-								}
-								*/
-								if(contact != null) {
-									Stanza iqvcard = new IQStanza(IQType.RESULT, stanza.getAttributeValueByName("id"));
-		
-									VCard vcard = new VCard(contact.displayName);
-									vcard.setEmail(contact.email);
-									
-									if(contact.avatar != null)
-										vcard.setAvatar(new String(Base64.encode(contact.avatar)), "image/jpeg");
-									else {
-										if(contact.email == null)
-											System.out.println("email is null wtf!!!!");
-										vcard.setAvatar(handle.getAvatar(contact.email), "image/jpeg");
-									}
-									
-									iqvcard.addAttribute("from", to);
-									
-									iqvcard.addChild(vcard);
-									
+								if(to.equals(handle.getID())) {
+									System.out.println("(II) Building self VCard");
+									vcard = new VCard(handle.getNickname());
+									vcard.setEmail(handle.getID());
 									try {
-										accounts.getConnection().write(iqvcard);
-									} catch (IOException e) {
-									}
-								} else if(to.equals(handle.getID())){
-									Stanza iqvcard = new IQStanza(IQType.RESULT, stanza.getAttributeValueByName("id"));
-									
-									VCard vcard = new VCard(handle.getNickname());
-									vcard.setEmail(to);
-									try {
-										vcard.setAvatar(handle.getSelfAvatar(), "image/jpeg");
+									 vcard.setAvatar(handle.getSelfAvatar(), "image/jpeg");
 									} catch(NullPointerException e) {
 									}
-									iqvcard.addAttribute("from", to);
-									
-									iqvcard.addChild(vcard);
-									
-									try {
-										accounts.getConnection().write(iqvcard);
-									} catch (IOException e) {
+									iqresult.addChild(vcard);
+								} else {
+									System.out.println("(II) Building VCard for " + to);
+									LegacyContact contact = handle.getContact(to);
+									if(contact != null) {
+										
+										vcard = new VCard(contact.displayName);
+										vcard.setEmail(contact.email);
+										if(contact.avatar != null) {
+											vcard.setAvatar(new String(Base64.encode(contact.avatar )), "image/jpeg");
+											System.out.println("(DEBUG) [Network: MSN] download completed successfully");
+										} else
+											System.err.println("(WW) Avatar unavailable");
+										iqresult.addChild(vcard);
 									}
+								}
+								
+								try {
+									accounts.getConnection().write(iqresult);
+								} catch (IOException e) {
 								}
 								
 							} else if(event.asStartElement().getName().getLocalPart().equals("ping")) {
@@ -329,8 +304,11 @@ public class MpimParseInput
 									vcard.setEmail(event.asCharacters().getData());
 								} else if(tag.getName().getLocalPart().equals("BINVAL")) {
 									event = xmlEvents.nextEvent();
-									String tmp = parse.substring(parse.indexOf("<BINVAL>")+"<BINVAL>".length(), parse.indexOf("</BINVAL>"));
-									vcard.setAvatar(tmp, "image/jpeg");
+									try {
+										String tmp = parse.substring(parse.indexOf("<BINVAL>")+"<BINVAL>".length(), parse.indexOf("</BINVAL>"));
+										vcard.setAvatar(tmp, "image/jpeg");
+									} catch(StringIndexOutOfBoundsException e) {
+									}
 								}
 							}
 						} else {
@@ -416,7 +394,7 @@ public class MpimParseInput
 						}
 					}
 				}
-			}			
+			}
 	
 		} catch (XMLStreamException e) {
 			System.out.println("(EE) parsing error, the last xml was " + event);

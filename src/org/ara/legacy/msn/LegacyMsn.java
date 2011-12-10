@@ -86,6 +86,27 @@ public class LegacyMsn extends LegacyNetwork {
 		if(msnContact != null)
 			contact = convertMsnContact(msnContact);
 
+		if(contact.avatar == null) {
+			MsnObject obj = msnContact.getAvatar();
+			if(obj != null) {
+				if(obj.getMsnObj() != null) {
+					contact.avatar = obj.getMsnObj();
+					contact.avatarSha1 = obj.getSha1d();
+				} else {
+					DisplayImageRetriever dir = new DisplayImageRetriever(this);
+					messenger.retrieveDisplayPicture(obj, dir);
+					holdOn();
+					
+					if(dir.picture != null) {
+						contact.avatar = dir.picture;
+						contact.avatarSha1 = dir.sha1;
+					} else
+						System.err.println("(EE) [Network: MSN] display image download failed");
+				}
+			}
+		}
+			
+		
 		return contact;
 	}
 	
@@ -273,11 +294,13 @@ public class LegacyMsn extends LegacyNetwork {
 	{
 		private LegacyMsn handle;
 		public byte[] picture;
+		public String sha1;
 
 		public DisplayImageRetriever(LegacyMsn handle)
 		{
 			this.handle = handle;
 			picture = null;
+			sha1 = null;
 		}
 
 		@Override
@@ -286,6 +309,7 @@ public class LegacyMsn extends LegacyNetwork {
 			
 			if(result == ResultStatus.GOOD) {
 				picture = resultBytes;
+				sha1 = msnObject.getSha1d();
 			}
 			
 			handle.wakeUp();
