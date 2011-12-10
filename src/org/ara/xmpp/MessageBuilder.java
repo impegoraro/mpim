@@ -1,13 +1,11 @@
 package org.ara.xmpp;
 
 import java.io.IOException;
+import java.util.List;
 
-import net.sf.jml.MsnContact;
-import net.sf.jml.MsnGroup;
-import net.sf.jml.MsnObject;
-import net.sf.jml.MsnUserStatus;
-
-import org.ara.MPIMMessenger;
+import org.ara.legacy.LegacyContact;
+import org.ara.legacy.LegacyUserStatus;
+import org.ara.util.Util;
 import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
 import org.ara.xmpp.stanzas.PresenceStanza;
@@ -17,7 +15,7 @@ public class MessageBuilder
 {
 	static int roster_ver = 0;
 	
-	public static void sendRoster(XMPPConnection out, String id, String email, MsnContact[] contacts)
+	public static void sendRoster(XMPPConnection out, String id, String email, List<LegacyContact> contacts)
 	{
 		Stanza roster = new IQStanza(IQType.RESULT, id);
 		Stanza query = new Stanza("query");
@@ -29,21 +27,20 @@ public class MessageBuilder
 		roster.addChild(query);		
 		
 		try {
-			for(MsnContact cont : contacts) {
+			for(LegacyContact cont : contacts) {
 				Stanza item = new Stanza("item");
 
-				item.addAttribute("jid", cont.getEmail().toString());
-				item.addAttribute("name", MPIMMessenger.encodeHTML(cont.getDisplayName()));
+				item.addAttribute("jid", cont.email);
+				item.addAttribute("name", Util.encodeHTML(cont.displayName));
 				item.addAttribute("subscription", "both");
 
-				if(cont.getBelongGroups() != null && cont.getBelongGroups().length > 0) {
-					for(MsnGroup grp : cont.getBelongGroups()) {
+				if(cont.groups != null) {
+					for(String grp : cont.groups) {
 						Stanza group = new Stanza("group", false, false);
-						group.setText(grp.getGroupName());
+						group.setText(grp);
 						item.addChild(group);
 					}
 				}
-				
 				query.addChild(item);
 			}
 			
@@ -56,25 +53,26 @@ public class MessageBuilder
 		}
 	}
 	
-	public static PresenceStanza bluildContactPresenceStanza(String email, MsnContact contact){
+	public static PresenceStanza bluildContactPresenceStanza(LegacyContact contact){
 		//PresenceStanza presence = new PresenceStanza(contact.getEmail().getEmailAddress(), email);
-		PresenceStanza presence = new PresenceStanza(contact.getEmail().getEmailAddress(), null);
-		MsnObject obj;
+		PresenceStanza presence = new PresenceStanza(contact.email, null);
 		
-		if(contact.getStatus() == MsnUserStatus.AWAY || contact.getStatus() == MsnUserStatus.BE_RIGHT_BACK || contact.getStatus() == MsnUserStatus.IDLE || contact.getStatus() == MsnUserStatus.OUT_TO_LUNCH)
+		if(contact.status == LegacyUserStatus.AVAILABLE)
+			presence.setShow("available");
+		else if(contact.status == LegacyUserStatus.AWAY)
 			presence.setShow("away");
-		
-		if(contact.getStatus() == MsnUserStatus.BUSY)
+		else if(contact.status == LegacyUserStatus.BUSY)
 			presence.setShow("dnd");
-		
-		if(contact.getStatus() == MsnUserStatus.OFFLINE && contact.getOldStatus() != MsnUserStatus.OFFLINE)
+		//else if(contact.status == LegacyUserStatus.UNAVAILABLE)
+			//presence.addAttribute("type", "unavailable");
+		else 
 			presence.addAttribute("type", "unavailable");
+			
+		if(contact.personalMessage != null && contact.personalMessage.length() > 0 )
+			presence.setStatus(contact.personalMessage);
 
-		if(contact.getPersonalMessage() != null && contact.getPersonalMessage().length() > 0 )
-			presence.setStatus(contact.getPersonalMessage());
-
-		if((obj = contact.getAvatar()) != null)
-			presence.setAvatar(obj.getSha1d());
+		if(contact.avatar != null)
+			presence.setAvatar(contact.avatarSha1);
 		else 
 			presence.setNoAvatar();
 		

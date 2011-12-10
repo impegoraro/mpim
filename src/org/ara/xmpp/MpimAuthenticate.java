@@ -21,7 +21,15 @@ import javax.xml.stream.events.Namespace;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
-import org.ara.MPIMMessenger;
+import org.ara.legacy.ContactListCallbacks;
+import org.ara.legacy.LegacyContact;
+import org.ara.legacy.LegacyNetwork;
+import org.ara.legacy.LoginCallbacks;
+import org.ara.legacy.LoginResult;
+import org.ara.legacy.MessageCallbacks;
+import org.ara.legacy.msn.LegacyMsn;
+import org.ara.util.Util;
+import org.ara.xmpp.stanzas.MessageChatStanza;
 import org.ara.xmpp.stanzas.Stanza;
 
 public class MpimAuthenticate extends Thread
@@ -112,7 +120,7 @@ public class MpimAuthenticate extends Thread
 					}
 
 				} else if(state == ConnectionState.AUTHENTICATING) {
-					MPIMMessenger msn = null;
+					LegacyNetwork legacy = null;
 					
 					if(event.isStartElement()) {
 						StartElement element = event.asStartElement();
@@ -120,7 +128,7 @@ public class MpimAuthenticate extends Thread
 						if(element.getName().getLocalPart().equals("iq")) {
 							iq_type = element.getAttributeByName(new QName("type")).getValue();
 							iq_id = element.getAttributeByName(new QName("id")).getValue();
-							//domain =  element.getAttributeByName(new QName("to")).getValue();
+							domain =  element.getAttributeByName(new QName("to")).getValue();
 							
 							/*TODO: Should check if the type is right */
 							
@@ -217,12 +225,15 @@ public class MpimAuthenticate extends Thread
 									break;
 								}
 								con = new XMPPConnection(sc, username, password, domain, resource);
-								msn = new MPIMMessenger(con.getBareJID(), password, this, con);
-								msn.start();
-
+								legacy = new LegacyMsn();
+								legacy.login(con.getBareJID(), password);
+								legacy.addCallbacks(new LoginHandler(this));
+								legacy.addCallbacks(new MessageHandler(con));
+								legacy.addCallbacks(new ContactListHandler(con));
+								
 								// should wait to see whether the login was successful 
 								goToSleep();
-								if(state == ConnectionState.AUTHENTICATED && msn != null) {
+								if(state == ConnectionState.AUTHENTICATED && legacy != null) {
 									Stanza iqSuccess = new Stanza("iq", true);
 									
 									iqSuccess.addAttribute("type", "result");
@@ -230,7 +241,7 @@ public class MpimAuthenticate extends Thread
 									sc.write(ByteBuffer.wrap(iqSuccess.getStanza().getBytes()));
 									
 									sc.configureBlocking(false);
-									sc.register(pool, SelectionKey.OP_READ, new Proxy(con, msn));
+									sc.register(pool, SelectionKey.OP_READ, new Proxy(con, legacy));
 									break;
 									
 								} else if(state == ConnectionState.NONAUTHENTICATED) {
@@ -279,5 +290,77 @@ public class MpimAuthenticate extends Thread
 
 	public void setState(ConnectionState state) {
 		this.state = state;  
+	}
+	
+	/* Definition of the Handlers */
+	private class LoginHandler implements LoginCallbacks
+	{
+		private MpimAuthenticate mpimAuth;
+		
+		public LoginHandler(MpimAuthenticate auth)
+		{
+			assert(auth != null);
+			mpimAuth = auth;
+		}
+		
+		@Override
+		public void loginCompleted(LoginResult result)
+		{
+			mpimAuth.setState(ConnectionState.AUTHENTICATED);
+			mpimAuth.wakeMePlease();	
+		}
+
+		@Override
+		public void loginFailed()
+		{
+			mpimAuth.setState(ConnectionState.NONAUTHENTICATED);
+			mpimAuth.wakeMePlease();
+		}
+	}
+	
+	private class ContactListHandler implements ContactListCallbacks
+	{
+		private XMPPConnection connection;
+		
+		public ContactListHandler(XMPPConnection connection)
+		{
+			assert(connection != null);
+			this.connection = connection;
+		}
+		
+		@Override
+		public void contactListReady()
+		{
+		}
+
+		@Override
+		public void contactChangedStatus(LegacyContact contact)
+		{
+			System.out.println("(II) Contact '"+ contact.displayName + "' changed his/her status to " + contact.status);
+			try {
+				connection.write(MessageBuilder.bluildContactPresenceStanza(contact));
+			} catch (IOException e) {
+			}
+		}
+	}
+	
+	private class MessageHandler implements MessageCallbacks
+	{
+		private XMPPConnection connection;
+		
+		public MessageHandler(XMPPConnection connection)
+		{
+			assert(connection != null);
+			this.connection = connection;
+		}
+		
+		@Override
+		public void receivedMessage(String from, String to, String message)
+		{
+			try {
+				connection.write(new MessageChatStanza(from, to, Util.encodeHTML(message)));
+			} catch (IOException e) {
+			}
+		}
 	}
 }

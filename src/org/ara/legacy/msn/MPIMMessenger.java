@@ -1,4 +1,4 @@
-package org.ara;
+package org.ara.legacy.msn;
 
 import java.io.IOException;
 
@@ -22,15 +22,15 @@ import net.sf.jml.message.MsnInstantMessage;
 import net.sf.jml.message.p2p.DisplayPictureRetrieveWorker;
 import net.sf.jml.util.Base64;
 
+import org.ara.util.Util;
 import org.ara.xmpp.ConnectionState;
-import org.ara.xmpp.MessageBuilder;
 import org.ara.xmpp.MpimAuthenticate;
 import org.ara.xmpp.XMPPConnection;
 import org.ara.xmpp.stanzas.MessageChatStanza;
 import org.ara.xmpp.stanzas.MessageControlStanza;
 import org.ara.xmpp.stanzas.VCard;
 
-public class MPIMMessenger extends Thread
+public class MPIMMessenger
 {
 	private String email;
 	private String password;
@@ -91,7 +91,7 @@ public class MPIMMessenger extends Thread
 	public void sendRoster(String id) {
 		this.goToSleep();
 
-		MessageBuilder.sendRoster(connection, id, email, getContacts());
+		//MessageBuilder.sendRoster(connection, id, email, getContacts());
 
 	}
 
@@ -114,7 +114,7 @@ public class MPIMMessenger extends Thread
 			obj = contact.getAvatar();
 		}
 
-		vcard = new VCard(encodeHTML(name));
+		vcard = new VCard(Util.encodeHTML(name));
 		vcard.setEmail(email);
 
 		if(obj != null) {
@@ -143,11 +143,11 @@ public class MPIMMessenger extends Thread
 			if(cont.getStatus() == MsnUserStatus.OFFLINE)
 				continue;
 
-			try {
+			/*try {
 				connection.write(MessageBuilder.bluildContactPresenceStanza(email, cont));
 			} catch (IOException e) {
 				e.printStackTrace();
-			}
+			}*/
 		}
 	}
 
@@ -261,11 +261,11 @@ public class MPIMMessenger extends Thread
 			//System.out.println("(DEBUG) " + contact.getDisplayName() + ":" + contact.getStatus() + " from " + contact.getOldStatus());
 			System.out.println("(II) Sending presence stanza");
 
-			try {
+			/*try {
 				connection.write(MessageBuilder.bluildContactPresenceStanza(email, contact));
 			} catch (IOException e) {
 				e.printStackTrace();
-			}
+			}*/
 		}
 	}
 
@@ -274,7 +274,7 @@ public class MPIMMessenger extends Thread
 		public void instantMessageReceived(MsnSwitchboard switchboard, MsnInstantMessage message, MsnContact contact)
 		{
 			try {
-				connection.write(new MessageChatStanza(contact.getEmail().getEmailAddress(),email, encodeHTML(message.getContent())));
+				connection.write(new MessageChatStanza(contact.getEmail().getEmailAddress(),email, Util.encodeHTML(message.getContent())));
 			} catch (IOException e) {
 			}
 
@@ -345,18 +345,5 @@ public class MPIMMessenger extends Thread
 
 		}
 
-	}
-
-	public static String encodeHTML(String s) {
-		StringBuffer out = new StringBuffer();
-		for (int i = 0; i < s.length(); i++) {
-			char c = s.charAt(i);
-			if (c > 127 || c == '"' || c == '<' || c == '>' || c == '&' || c == '\'') {
-				out.append("&#" + (int) c + ";");
-			} else {
-				out.append(c);
-			}
-		}
-		return out.toString();
 	}
 }

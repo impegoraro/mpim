@@ -18,7 +18,10 @@ import javax.xml.stream.events.Namespace;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
-import org.ara.MPIMMessenger;
+import net.sf.jml.util.Base64;
+
+import org.ara.legacy.LegacyContact;
+import org.ara.legacy.LegacyNetwork;
 import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
 import org.ara.xmpp.stanzas.MessageChatStanza;
@@ -32,7 +35,7 @@ public class MpimParseInput
 	private SocketChannel sc;
 	private String parse;
 	private Proxy accounts;
-
+	
 	public MpimParseInput(SelectionKey key){
 		String inicial ="<stream>";
 		String end = "</stream>";
@@ -48,8 +51,9 @@ public class MpimParseInput
 				// Channel is closed, close the channel and remove the key from the selector
 				key.cancel();
 				accounts.close();
-			} else
+			} else {
 				parse = inicial + (new String(data.array())).trim() + end;
+			}
 
 			if(parse.equals("\0") || parse.length()==0)
 				parse = null;
@@ -138,7 +142,7 @@ public class MpimParseInput
 					if(event.isStartElement()) {
 						if(stanza.getAttributeValueByName("type").equals("get")) {
 							if(event.asStartElement().getName().getLocalPart().equals("query")) {
-								MPIMMessenger msn = accounts.getMSN();
+								LegacyNetwork legacy = accounts.getHandle();
 								@SuppressWarnings("rawtypes")
 								Iterator i = event.asStartElement().getNamespaces();
 
@@ -150,11 +154,19 @@ public class MpimParseInput
 
 								if(namespace.equals("jabber:iq:roster")) {
 									System.out.println("(II) Asking for roster");
-
-									msn.sendRoster(id);
-									msn.setAllowPresence(true);
-									msn.sendContactListPresence();
-
+									
+									/*TODO: remove busy waiting for something better*/
+									while(!legacy.contactListReady()) {
+										System.out.println("Busy waiting: " + legacy.contactListReady());
+									}
+									
+									MessageBuilder.sendRoster(accounts.getConnection(), id, accounts.getHandle().getID(), legacy.getContacts());
+									for(LegacyContact contact : legacy.getContacts()) {
+										try {
+											accounts.getConnection().write(MessageBuilder.bluildContactPresenceStanza(contact));
+										} catch (IOException e) {
+										}
+									}
 								} else if(namespace.equals("jabber:iq:version")) {
 									Stanza version = new IQStanza(IQType.RESULT, id);
 									Stanza query = new Stanza("query").addAttribute("xml", "jabber:iq:version");
@@ -226,7 +238,11 @@ public class MpimParseInput
 								}
 							} else if(event.asStartElement().getName().getLocalPart().equals("vCard")) {
 								/* Build and send VCard */
+								String to = stanza.getAttributeValueByName("to");
+								LegacyNetwork handle = accounts.getHandle();
+								LegacyContact contact = handle.getContact(to);
 								
+								/*
 								Stanza iqvcard = new IQStanza(IQType.RESULT, stanza.getAttributeValueByName("id"));;
 								String to = stanza.getAttributeValueByName("to");
 
@@ -241,6 +257,47 @@ public class MpimParseInput
 								try {
 									accounts.getConnection().write(iqvcard);
 								} catch (IOException e) {
+								}
+								*/
+								if(contact != null) {
+									Stanza iqvcard = new IQStanza(IQType.RESULT, stanza.getAttributeValueByName("id"));
+		
+									VCard vcard = new VCard(contact.displayName);
+									vcard.setEmail(contact.email);
+									
+									if(contact.avatar != null)
+										vcard.setAvatar(new String(Base64.encode(contact.avatar)), "image/jpeg");
+									else {
+										if(contact.email == null)
+											System.out.println("email is null wtf!!!!");
+										vcard.setAvatar(handle.getAvatar(contact.email), "image/jpeg");
+									}
+									
+									iqvcard.addAttribute("from", to);
+									
+									iqvcard.addChild(vcard);
+									
+									try {
+										accounts.getConnection().write(iqvcard);
+									} catch (IOException e) {
+									}
+								} else if(to.equals(handle.getID())){
+									Stanza iqvcard = new IQStanza(IQType.RESULT, stanza.getAttributeValueByName("id"));
+									
+									VCard vcard = new VCard(handle.getNickname());
+									vcard.setEmail(to);
+									try {
+										vcard.setAvatar(handle.getSelfAvatar(), "image/jpeg");
+									} catch(NullPointerException e) {
+									}
+									iqvcard.addAttribute("from", to);
+									
+									iqvcard.addChild(vcard);
+									
+									try {
+										accounts.getConnection().write(iqvcard);
+									} catch (IOException e) {
+									}
 								}
 								
 							} else if(event.asStartElement().getName().getLocalPart().equals("ping")) {
@@ -272,7 +329,7 @@ public class MpimParseInput
 									vcard.setEmail(event.asCharacters().getData());
 								} else if(tag.getName().getLocalPart().equals("BINVAL")) {
 									event = xmlEvents.nextEvent();
-									String tmp = event.asCharacters().getData();
+									String tmp = parse.substring(parse.indexOf("<BINVAL>")+"<BINVAL>".length(), parse.indexOf("</BINVAL>"));
 									vcard.setAvatar(tmp, "image/jpeg");
 								}
 							}
@@ -288,10 +345,10 @@ public class MpimParseInput
 							if(to != null)
 								iqresult.addAttribute("from", to);
 							
-							MPIMMessenger handle = accounts.getMSN();
+							LegacyNetwork handle = accounts.getHandle();
 							VCard vcard = (VCard) stanzaOut;
-							handle.setAccountName(vcard.getNickname());
-							handle.setDisplayPicture(vcard.getAvatar());
+							handle.setNickname(vcard.getNickname());
+							handle.setAvatar(vcard.getAvatar());
 							stanzaOut = null;
 							
 							try {
@@ -326,7 +383,7 @@ public class MpimParseInput
 							} catch(Exception e){
 							}
 							
-							accounts.getMSN().setStatus((show == null)? "" : show, (status == null)? "" : status);
+							accounts.getHandle().changedStatus((show == null)? "" : show, (status == null)? "" : status);
 							
 							stanza = null;
 						}
@@ -352,7 +409,7 @@ public class MpimParseInput
 									msg = stanza.getChildValue("body");
 								} catch (Exception e) {
 								}
-								accounts.getMSN().sendMessage(stanza.getAttributeValueByName("to"), msg);
+								accounts.getHandle().sendMessage(stanza.getAttributeValueByName("to"), msg);
 							}
 
 							stanza = null;

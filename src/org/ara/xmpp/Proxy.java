@@ -1,16 +1,16 @@
 package org.ara.xmpp;
 
-import org.ara.MPIMMessenger;
+import org.ara.legacy.LegacyNetwork;
 
 public class Proxy 
 {
 	private XMPPConnection connection;
-	private MPIMMessenger msn;
+	private LegacyNetwork legacyHandle;
 	
-	public Proxy(XMPPConnection con, MPIMMessenger msn)
+	public Proxy(XMPPConnection con, LegacyNetwork handle)
 	{
 		this.connection = con;
-		this.msn = msn;
+		this.legacyHandle = handle;
 	}
 	
 	public XMPPConnection getConnection()
@@ -18,16 +18,18 @@ public class Proxy
 		return connection;
 	}
 	
-	public MPIMMessenger getMSN()
+	public LegacyNetwork getHandle()
 	{
-		return msn;
+		return legacyHandle;
 	}
 	
 	public synchronized void close()
 	{
-		if(connection != null && msn != null) {
-			msn.close();
-			connection.close();
+		if(connection != null && legacyHandle != null) {
+			legacyHandle.logout();
+			/* Since the introduction of LegacyNetwork Callbacks we close the connection
+			 * to the xmpp client whenever the legacy network connection goes down */
+			//connection.close();
 		}
 	}
 }

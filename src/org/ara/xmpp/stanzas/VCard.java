@@ -83,12 +83,16 @@ public class VCard extends Stanza
 			avatar.addChild(binval);
 			this.addChild(avatar);
 		} else {
+			if(avatar.isSimple()) {
+				
+			}
 			type = avatar.getChildByName("TYPE");
 			binval = avatar.getChildByName("BINVAL");
 		}
 		
-		type.setText(new String(imageType));
-		binval.setText(new String(base64Photo));
+		assert(type != null && binval != null);
+		type.setText(imageType);
+		binval.setText(base64Photo);
 		
 		return this;
 	}
