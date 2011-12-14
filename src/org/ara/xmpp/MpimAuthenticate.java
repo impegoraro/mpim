@@ -126,9 +126,10 @@ public class MpimAuthenticate extends Thread
 						StartElement element = event.asStartElement();
 						
 						if(element.getName().getLocalPart().equals("iq")) {
-							iq_type = element.getAttributeByName(new QName("type")).getValue();
-							iq_id = element.getAttributeByName(new QName("id")).getValue();
-							domain =  element.getAttributeByName(new QName("to")).getValue();
+							
+							iq_type = getAttributeValue(element, "type");
+							iq_id = getAttributeValue(element, "id");
+							domain =  getAttributeValue(element, "to");
 							
 							/*TODO: Should check if the type is right */
 							
@@ -290,6 +291,17 @@ public class MpimAuthenticate extends Thread
 
 	public void setState(ConnectionState state) {
 		this.state = state;  
+	}
+	
+	private static String getAttributeValue(StartElement element, String name)
+	{
+		String value = null;
+		Attribute attr = element.getAttributeByName(new QName(name));
+		
+		if(attr != null)
+			value = attr.getValue();
+		
+		return value;
 	}
 	
 	/* Definition of the Handlers */
