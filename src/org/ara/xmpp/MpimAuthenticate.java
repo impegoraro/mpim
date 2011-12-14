@@ -21,6 +21,7 @@ import javax.xml.stream.events.Namespace;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
+import org.apache.commons.lang.StringEscapeUtils;
 import org.ara.legacy.ContactListCallbacks;
 import org.ara.legacy.LegacyContact;
 import org.ara.legacy.LegacyNetwork;
@@ -28,7 +29,6 @@ import org.ara.legacy.LoginCallbacks;
 import org.ara.legacy.LoginResult;
 import org.ara.legacy.MessageCallbacks;
 import org.ara.legacy.msn.LegacyMsn;
-import org.ara.util.Util;
 import org.ara.xmpp.stanzas.MessageChatStanza;
 import org.ara.xmpp.stanzas.Stanza;
 
@@ -358,7 +358,7 @@ public class MpimAuthenticate extends Thread
 		public void receivedMessage(String from, String to, String message)
 		{
 			try {
-				connection.write(new MessageChatStanza(from, to, Util.encodeHTML(message)));
+				connection.write(new MessageChatStanza(from, to, StringEscapeUtils.escapeHtml(message)));
 			} catch (IOException e) {
 			}
 		}

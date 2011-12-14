@@ -23,6 +23,7 @@ import net.sf.jml.message.MsnInstantMessage;
 import net.sf.jml.message.p2p.DisplayPictureRetrieveWorker;
 import net.sf.jml.util.Base64;
 
+import org.apache.commons.lang.StringEscapeUtils;
 import org.ara.legacy.LegacyContact;
 import org.ara.legacy.LegacyNetwork;
 import org.ara.legacy.LegacyUserStatus;
@@ -114,8 +115,8 @@ public class LegacyMsn extends LegacyNetwork {
 	public void sendMessage(String to, String msg)
 	{
 		assert(to != null && msg != null);
-		
-		messenger.sendText(Email.parseStr(to), msg);
+
+		messenger.sendText(Email.parseStr(to), StringEscapeUtils.unescapeHtml(msg));
 	}
 	
 	@Override
@@ -238,29 +239,6 @@ public class LegacyMsn extends LegacyNetwork {
 	
 	/* Private and Protected Methods */
 	
-	private MsnObject getAvatar(MsnContact contact)
-	{
-		MsnObject obj = contact.getAvatar();
-		
-		if(obj != null) {
-			if(obj.getMsnObj() != null) {
-				return obj;
-			}
-			else {
-				DisplayImageRetriever dir = new DisplayImageRetriever(this);
-
-				messenger.retrieveDisplayPicture(obj, dir);
-				// wait until the transfer is done 
-				holdOn();
-				
-				if(dir.picture != null) 
-					return obj;
-			}
-		}
-		
-		return null;
-	}
-	
 	private LegacyContact convertMsnContact(MsnContact msnContact)
 	{
 		LegacyContact legContact = new LegacyContact();
@@ -278,7 +256,9 @@ public class LegacyMsn extends LegacyNetwork {
 			legContact.status = LegacyUserStatus.BUSY; 
 		else if(msnContact.getStatus() == MsnUserStatus.OFFLINE && msnContact.getOldStatus() != MsnUserStatus.OFFLINE)
 			legContact.status = LegacyUserStatus.UNAVAILABLE;
-		
+		else
+			legContact.status = LegacyUserStatus.AVAILABLE;
+			
 		for(MsnGroup grp : msnContact.getBelongGroups())
 			legContact.addGroup(grp.getGroupName());
 		

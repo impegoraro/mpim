@@ -3,9 +3,9 @@ package org.ara.xmpp;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.commons.lang.StringEscapeUtils;
 import org.ara.legacy.LegacyContact;
 import org.ara.legacy.LegacyUserStatus;
-import org.ara.util.Util;
 import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
 import org.ara.xmpp.stanzas.PresenceStanza;
@@ -31,7 +31,7 @@ public class MessageBuilder
 				Stanza item = new Stanza("item");
 
 				item.addAttribute("jid", cont.email);
-				item.addAttribute("name", Util.encodeHTML(cont.displayName));
+				item.addAttribute("name", StringEscapeUtils.escapeHtml(cont.displayName));
 				item.addAttribute("subscription", "both");
 
 				if(cont.groups != null) {

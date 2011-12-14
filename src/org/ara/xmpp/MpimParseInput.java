@@ -35,25 +35,39 @@ public class MpimParseInput
 	private SocketChannel sc;
 	private String parse;
 	private Proxy accounts;
+	private String body;
 	
 	public MpimParseInput(SelectionKey key){
 		String inicial ="<stream>";
 		String end = "</stream>";
+		String tmp;
+		int i;
+		
+		body = null;
 		sc = (SocketChannel) key.channel();
 		accounts = (Proxy) key.attachment();
 		
 		/*TODO: find a way to encode html character that are not in the xml code, i. e. in the body tag*/
 		
 		try{
-			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize() + inicial.length() + end.length());
+			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize());
 
 			if(sc.read(data) == -1) {
 				// Channel is closed, close the channel and remove the key from the selector
 				key.cancel();
 				accounts.close();
 			} else {
-				
-					parse = inicial + (new String(data.array())).trim() + end;
+				parse = inicial;
+				tmp = new String(data.array()).trim();
+				i = tmp.indexOf("<body>");
+				if(i == -1 )
+					parse += tmp + end;
+				else {
+					parse += tmp.substring(0, i + "<body>".length()) + " ";
+					body = tmp.substring(i + "<body>".length(), tmp.lastIndexOf("</body>"));
+					parse += tmp.substring(tmp.lastIndexOf("</body>")) + end;
+					
+				}
 			}
 
 			if(parse.equals("\0") || parse.length()==0)
@@ -341,13 +355,10 @@ public class MpimParseInput
 				} else if(stanza instanceof  PresenceStanza) {
 				
 					if(event.isStartElement()) {						
-						if(event.asStartElement().getName().getLocalPart().equals("show") || 
-						   event.asStartElement().getName().getLocalPart().equals("status")) {
-							
-							Stanza tmp = new Stanza(event.asStartElement().getName().getLocalPart(), true);
-							tmp.setText(xmlEvents.nextEvent().asCharacters().getData());
-							stanza.addChild(tmp);
-						}
+						if(event.asStartElement().getName().getLocalPart().equals("show"))
+							((PresenceStanza) stanza).setShow(xmlEvents.nextEvent().asCharacters().getData());
+						else if(event.asStartElement().getName().getLocalPart().equals("status"))
+							((PresenceStanza) stanza).setStatus(xmlEvents.nextEvent().asCharacters().getData());
 						
 					} else if(event.isEndElement()) {
 
@@ -361,7 +372,7 @@ public class MpimParseInput
 							} catch(Exception e){
 							}
 							
-							accounts.getHandle().changedStatus((show == null)? "" : show, (status == null)? "" : status);
+							accounts.getHandle().changedStatus(show, status);
 							
 							stanza = null;
 						}
@@ -370,11 +381,12 @@ public class MpimParseInput
 				} else if(stanza instanceof MessageStanza) {
 					if(event.isStartElement()) {
 						if(event.asStartElement().getName().getLocalPart().equals("body")) {
-							String msg;
+							//String msg;
 							
 							event = xmlEvents.nextEvent();
-							msg = event.asCharacters().getData();
-							((MessageChatStanza) stanza).setBody(msg);
+							//msg = event.asCharacters().getData();
+							body = (body == null) ? "" : body;
+							((MessageChatStanza) stanza).setBody(body);
 							event = xmlEvents.nextEvent();
 						}
 						

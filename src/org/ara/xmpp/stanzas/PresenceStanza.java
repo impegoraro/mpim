@@ -41,7 +41,9 @@ public class PresenceStanza extends Stanza
 		assert(status != null);
 		Stanza sstatus;
 		
-		sstatus = new Stanza("status", false, false);
+		sstatus = getChildByName("status");
+		if(sstatus == null)
+			sstatus = new Stanza("status", false, false);
 		sstatus.setText(status);
 		
 		addChild(sstatus);
@@ -52,7 +54,9 @@ public class PresenceStanza extends Stanza
 		assert(show != null);
 		Stanza sshow;
 		
-		sshow = new Stanza("show", false, false);
+		sshow = getChildByName("show");
+		if(sshow == null)
+			sshow = new Stanza("show", false, false);
 		sshow.setText(show);
 		
 		addChild(sshow);
