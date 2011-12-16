@@ -254,10 +254,10 @@ public class LegacyMsn extends LegacyNetwork {
 			legContact.status = LegacyUserStatus.AWAY;
 		else if(msnContact.getStatus() == MsnUserStatus.BUSY)
 			legContact.status = LegacyUserStatus.BUSY; 
-		else if(msnContact.getStatus() == MsnUserStatus.OFFLINE && msnContact.getOldStatus() != MsnUserStatus.OFFLINE)
-			legContact.status = LegacyUserStatus.UNAVAILABLE;
+		//else if(msnContact.getStatus() == MsnUserStatus.OFFLINE && msnContact.getOldStatus() != MsnUserStatus.OFFLINE)
+			//legContact.status = LegacyUserStatus.UNAVAILABLE;
 		else
-			legContact.status = LegacyUserStatus.AVAILABLE;
+			legContact.status = LegacyUserStatus.UNAVAILABLE;
 			
 		for(MsnGroup grp : msnContact.getBelongGroups())
 			legContact.addGroup(grp.getGroupName());
