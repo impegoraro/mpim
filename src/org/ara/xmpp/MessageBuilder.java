@@ -71,7 +71,7 @@ public class MessageBuilder
 		if(contact.personalMessage != null && contact.personalMessage.length() > 0 )
 			presence.setStatus(contact.personalMessage);
 
-		if(contact.avatar != null)
+		if(contact.avatarSha1 != null)
 			presence.setAvatar(contact.avatarSha1);
 		else 
 			presence.setNoAvatar();
