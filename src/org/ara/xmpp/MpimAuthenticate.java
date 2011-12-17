@@ -36,6 +36,7 @@ import org.ara.legacy.LegacyNetwork;
 import org.ara.legacy.LoginCallbacks;
 import org.ara.legacy.LoginResult;
 import org.ara.legacy.MessageCallbacks;
+import org.ara.legacy.irc.LegacyIRC;
 import org.ara.legacy.msn.LegacyMsn;
 import org.ara.xmpp.stanzas.MessageChatStanza;
 import org.ara.xmpp.stanzas.Stanza;
@@ -259,7 +260,18 @@ public class MpimAuthenticate
 								}
 
 								con = new XMPPConnection(con.socket(), username, password, domain, resource, useTLS);
-								legacy = new LegacyMsn();
+								if(resource.startsWith("irc")) {
+									String tmp[] = con.getBareJID().split("@");
+									if(tmp.length == 2)
+										legacy = new LegacyIRC(tmp[0], tmp[1]);
+									else {
+										// Unable to create legacy network
+										wakeMePlease(); // simulate signal to wake up
+										state = ConnectionState.NONAUTHENTICATED; // set connection state
+									}
+								} else
+									legacy = new LegacyMsn();
+								
 								legacy.login(con.getBareJID(), password);
 								legacy.addCallbacks(new LoginHandler(this, con));
 								legacy.addCallbacks(new MessageHandler(con));

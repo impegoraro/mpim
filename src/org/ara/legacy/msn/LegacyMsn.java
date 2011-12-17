@@ -16,6 +16,7 @@ import net.sf.jml.MsnUserStatus;
 import net.sf.jml.event.MsnContactListAdapter;
 import net.sf.jml.event.MsnMessageAdapter;
 import net.sf.jml.event.MsnMessengerAdapter;
+import net.sf.jml.event.MsnSwitchboardListener;
 import net.sf.jml.impl.MsnMessengerFactory;
 import net.sf.jml.message.MsnControlMessage;
 import net.sf.jml.message.MsnDatacastMessage;
@@ -56,6 +57,7 @@ public class LegacyMsn extends LegacyNetwork {
 		messenger.addMessengerListener(new MpimMsnMessenger());
 		messenger.addContactListListener(new MpimMsnContactList(this));
 		messenger.addMessageListener(new MpimMsnMessage());
+		messenger.addSwitchboardListener(new MpimMsnSwitchboard());
 		messenger.login();
 	}
 
@@ -394,5 +396,33 @@ public class LegacyMsn extends LegacyNetwork {
 
 		}
 	}
+
 	
+	private class MpimMsnSwitchboard implements MsnSwitchboardListener
+	{
+		@Override
+		public void contactJoinSwitchboard(MsnSwitchboard arg0, MsnContact arg1)
+		{
+			System.out.println("(DEBUG) [Network: MSN] contact " + arg1.getDisplayName() + ", joined the switchboard");
+		}
+
+		@Override
+		public void contactLeaveSwitchboard(MsnSwitchboard arg0, MsnContact arg1)
+		{
+			System.out.println("(DEBUG) [Network: MSN] contact " + arg1.getDisplayName() + ", leaved the switchboard");
+		}
+
+		@Override
+		public void switchboardClosed(MsnSwitchboard arg0)
+		{
+			System.out.println("(DEBUG) [Network: MSN] the switchboard has been closed");
+		}
+
+		@Override
+		public void switchboardStarted(MsnSwitchboard arg0)
+		{
+			System.out.println("(DEBUG) [Network: MSN] the switchboard has been started");
+		}
+		
+	}
 }
