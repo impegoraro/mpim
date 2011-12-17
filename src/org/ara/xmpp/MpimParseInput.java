@@ -3,10 +3,7 @@ package org.ara.xmpp;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
-import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.SocketChannel;
+import java.net.SocketException;
 import java.util.Iterator;
 
 import javax.xml.namespace.QName;
@@ -20,6 +17,7 @@ import javax.xml.stream.events.XMLEvent;
 
 import net.sf.jml.util.Base64;
 
+import org.apache.http.ConnectionClosedException;
 import org.ara.legacy.LegacyContact;
 import org.ara.legacy.LegacyNetwork;
 import org.ara.xmpp.stanzas.IQStanza;
@@ -32,33 +30,31 @@ import org.ara.xmpp.stanzas.VCard;
 
 public class MpimParseInput
 {
-	private SocketChannel sc;
 	private String parse;
 	private Proxy accounts;
 	private String body;
 	
-	public MpimParseInput(SelectionKey key){
+	public MpimParseInput(Proxy proxy) throws ConnectionClosedException 
+	{
+		//assert(parse != null && proxy != null);
+		assert(proxy != null);
 		String inicial ="<stream>";
 		String end = "</stream>";
 		String tmp;
 		int i;
 		
 		body = null;
-		sc = (SocketChannel) key.channel();
-		accounts = (Proxy) key.attachment();
-		
-		/*TODO: find a way to encode html character that are not in the xml code, i. e. in the body tag*/
-		
+		accounts = proxy;
 		try{
-			ByteBuffer data = ByteBuffer.allocate(sc.socket().getSendBufferSize());
+			byte data[] = new byte[accounts.getConnection().socket().getSendBufferSize()];
 
-			if(sc.read(data) == -1) {
+			if(accounts.getConnection().socket().getInputStream().read(data) == -1) {
 				// Channel is closed, close the channel and remove the key from the selector
-				key.cancel();
 				accounts.close();
+				throw new ConnectionClosedException("Connection is closed"); 
 			} else {
 				parse = inicial;
-				tmp = new String(data.array()).trim();
+				tmp = new String(data).trim();
 				i = tmp.indexOf("<body>");
 				if(i == -1 )
 					parse += tmp + end;
@@ -73,21 +69,20 @@ public class MpimParseInput
 			if(parse.equals("\0") || parse.length()==0)
 				parse = null;
 
-		} catch(ClosedChannelException e) {
-			System.out.println("(WW) Closed channel ");
-			accounts.close();
-
 		} catch(NullPointerException e) {
-			if(sc == null) {
-				System.out.println("(EE) Unrecoverable error: the socket is null. Ending the application");
-				System.exit(1);
+			System.err.println("(EE) Unrecoverable error: the socket is null");
+		} catch (SocketException e) {
+			try {
+				accounts.close();
+			} catch(NullPointerException e1) {
 			}
-		} catch (Exception e) {
+				throw new ConnectionClosedException("Connection is closed");
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
-	public void run()
+	public void parse()
 	{
 		String id = "";
 		Stanza stanza = null;
@@ -132,8 +127,10 @@ public class MpimParseInput
 							
 							if(attrType.getValue().equals("set"))
 								type = IQType.SET;
-							else 
+							else if(attrType.getValue().equals("get"))
 								type = IQType.GET;
+							else
+								type = IQType.ERROR;
 							
 							stanza = new IQStanza(type, id);
 							
@@ -171,9 +168,8 @@ public class MpimParseInput
 									System.out.println("(II) Asking for roster");
 									
 									/*TODO: remove busy waiting for something better*/
-									while(!legacy.contactListReady()) {
-										System.out.println("Busy waiting: " + legacy.contactListReady());
-									}
+									while(!legacy.contactListReady())
+										System.out.print("");
 									
 									MessageBuilder.sendRoster(accounts.getConnection(), id, accounts.getHandle().getID(), legacy.getContacts());
 									for(LegacyContact contact : legacy.getContacts()) {
@@ -210,17 +206,6 @@ public class MpimParseInput
 									query.addChild(new Stanza("feature").addAttribute("var", "vcard-temp"));
 									iqresult.addChild(query);
 
-									/*Stanza error = new Stanza("error");
-									Stanza notAllowd = new Stanza("service-unavailable", true);
-									error.addAttribute("type", "cancel");
-
-									query.addAttribute("xmlns", "http://jabber.org/protocol/disco#info");
-									query.addAttribute("node", "http://jabber.org/protocol/commands");
-									iqresult.addChild(query);
-									iqresult.addChild(error);
-									notAllowd.addAttribute("xmlns" ,"urn:ietf:params:xml:ns:xmpp-stanzas");
-									error.addChild(notAllowd);*/
-									
 									try {
 										accounts.getConnection().write(iqresult);
 									} catch (IOException e) {
@@ -244,9 +229,8 @@ public class MpimParseInput
 									error.addChild(notAllowd);
 
 									try {
-										sc.write(ByteBuffer.wrap(iqresult.getStanza().getBytes()));
+										accounts.getConnection().write(iqresult);
 									} catch (IOException e) {
-										e.printStackTrace();
 									}
 								} else {
 									System.out.println("(WW) Unsuported namespace: '" + namespace+ "' id is " + id);

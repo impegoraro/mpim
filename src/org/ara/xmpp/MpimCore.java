@@ -1,17 +1,13 @@
 package org.ara.xmpp;
 
-
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.nio.channels.spi.SelectorProvider;
-import java.util.Iterator;
+import java.net.ServerSocket;
+import java.net.Socket;
 
-public class MpimCore
+import org.apache.http.ConnectionClosedException;
+
+
+public class MpimCore extends Thread
 {
 	private final static String prog_version = "0.5";
 	private final static String prog_name = "mpim";
@@ -19,27 +15,14 @@ public class MpimCore
 		"Ilan Pegoraro <impegoraro@ua.pt> ",
 		"Renato Almeida <renato.almeida@ua.pt>"
 	};
-	private volatile Selector selector;
-	private ServerSocketChannel sChan;
+	private final static int port = 5222; 
 
-	ConnectionState state;
+	// Class attributes 
+	private Socket sock;
 
-	public MpimCore(int port)
+	public MpimCore(Socket client)
 	{
-		try {
-			InetSocketAddress iaddr = new InetSocketAddress(InetAddress.getByName("0.0.0.0"), port);
-
-			selector = SelectorProvider.provider().openSelector();
-
-			sChan = ServerSocketChannel.open();
-			sChan.configureBlocking(false);
-			sChan.socket().bind(iaddr);
-			sChan.register(selector, SelectionKey.OP_ACCEPT);
-
-		} catch (IOException e) {
-			System.err.println("(EE) unable to set up server. Ending the application");
-			System.exit(1);
-		}
+		sock = client;
 	}
 
 	public static final String getVersion()
@@ -57,55 +40,34 @@ public class MpimCore
 		return prog_authors;
 	}
 
+	@Override
 	public void run()
 	{
-		Iterator<SelectionKey> selectedKeys;
+		MpimAuthenticate newUser = new MpimAuthenticate(sock); // Create a new authentication for this user, using default options
+		System.out.println("(II) Authenticating new client '" + sock.getInetAddress().getHostAddress()+ "'");
 
-		try {
-			while(true) {
-				selector.select();
+		Proxy p = newUser.authenticate();
 
-				selectedKeys = selector.selectedKeys().iterator();
-				while(selectedKeys.hasNext()) {
-					SelectionKey key = (SelectionKey) selectedKeys.next();
-					selectedKeys.remove();
-
-					if(!key.isValid()) {
-						continue;
-					}
-
-					// Finish connection in case of an error 
-					if(key.isConnectable()) {
-						SocketChannel ssc = (SocketChannel) key.channel();
-
-						if(ssc.isConnectionPending())
-							ssc.finishConnect();
-
-					} else if(key.isAcceptable()) { 
-						// Incoming connection, proceed with procedure to add the peer's socket to the list
-
-						ServerSocketChannel ssc = (ServerSocketChannel) key.channel();
-						SocketChannel newClient = ssc.accept();
-
-						System.out.println("(II) Accepted incomming connection form " + newClient.socket().getInetAddress().getHostAddress());
-
-						MpimAuthenticate auth = new MpimAuthenticate(selector,  newClient);
-						auth.run();
-
-					} else if(key.isReadable()) {
-						MpimParseInput mpi = new MpimParseInput(key);
-						mpi.run();
-					}
+		if(newUser.getState() == ConnectionState.AUTHENTICATED) {
+			System.out.println("(II) Client '" + sock.getInetAddress().getHostAddress()+ " (" + p.getConnection().getBareJID() + ")' has been authenticated");
+			while(p.getConnection().socket().isConnected()) {
+				MpimParseInput input = null;
+				try {
+					input = new MpimParseInput(p);
+				} catch (ConnectionClosedException e) {
+					break;
 				}
+				input.parse();
 			}
-		} catch (IOException e) {
-			e.printStackTrace();
+		} else {
+			System.err.println("(WW) The new user could not be authenticated");
 		}
 	}
 
 	public static void main(String args[])
 	{
-		MpimCore mpim = new MpimCore(5222);
+		ServerSocket serverSock;
+		Socket client;
 
 		if(args.length > 0){
 			if(args[0].equals("-v") || args[0].equals("--version")) {
@@ -122,9 +84,18 @@ public class MpimCore
 			}
 
 		}
-
-		System.out.println("(II) Mpim server has been initialized");
-		System.out.println("(II) Waiting for connections...");
-		mpim.run();
+		System.out.println("(II) "+ prog_name + " (v" + prog_version + ") server has been initialized");
+		try {
+			serverSock = new ServerSocket(port);
+			while(true) {
+				System.out.println("(II) Listening for connections on port " + port + "...");
+				client = serverSock.accept();
+				Thread mpim = new MpimCore(client);
+				mpim.run();
+				client = null;
+			}	
+		} catch (IOException e) {
+			System.err.println("(EE) Unable to create and bind the socket to the port " + port);
+		}
 	}
 }

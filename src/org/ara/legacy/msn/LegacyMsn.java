@@ -63,6 +63,8 @@ public class LegacyMsn extends LegacyNetwork {
 	public void logout()
 	{
 		messenger.logout();
+		if(loginHandler != null)
+			loginHandler.logout();
 	}
 	
 	@Override

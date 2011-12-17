@@ -4,10 +4,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
-import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.SocketChannel;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -44,28 +40,26 @@ import org.ara.legacy.msn.LegacyMsn;
 import org.ara.xmpp.stanzas.MessageChatStanza;
 import org.ara.xmpp.stanzas.Stanza;
 
-public class MpimAuthenticate extends Thread
+public class MpimAuthenticate
 {
-	SocketChannel sc;
-	boolean restart;
-	boolean useTLS;
-	Selector pool;
-	String domain;
-	ConnectionState state;
-	Stanza stream;
-	String keyStore = "/home/ilan/Escritorio/cert/mpim.jks";
-	String certificateChain = "/home/ilan/Escritorio/cert/mpim.crt";
-	String privateKey = "/home/ilan/Escritorio/cert/mpim.key";
-	char certPassword[] = "h2r3x_rul3s".toCharArray();
+	private boolean restart;
+	private boolean useTLS;
+	private XMPPConnection con;
+	private String domain;
+	private ConnectionState state;
+	private Stanza stream;
+	private String keyStore = "/home/ilan/Escritorio/cert/mpim.jks";
+	//private String certificateChain = "/home/ilan/Escritorio/cert/mpim.crt";
+	//private String privateKey = "/home/ilan/Escritorio/cert/mpim.key";
+	private char certPassword[] = "h2r3x_rul3s".toCharArray();
 
-	public MpimAuthenticate(Selector pool, SocketChannel socket, boolean useTLS)
+	public MpimAuthenticate(Socket socket, boolean useTLS)
 	{
-		this.sc = socket;
-		this.pool = pool;
+		con = new XMPPConnection(socket);
+		state = ConnectionState.DISCONNECTED;
 		restart = false;
 		this.useTLS = useTLS;
 		domain = null;
-		state = ConnectionState.DISCONNECTED;
 		stream = new Stanza("stream:stream");
 		stream.addAttribute("version", "1.0");
 		stream.addAttribute("xml:lang", "en");
@@ -74,13 +68,12 @@ public class MpimAuthenticate extends Thread
 		stream.addAttribute("xmlns:stream", "http://etherx.jabber.org/streams");
 	}
 
-	public MpimAuthenticate(Selector pool, SocketChannel socket)
+	public MpimAuthenticate(Socket socket)
 	{
-		this(pool, socket, false);
+		this(socket, true);
 	}
 
-	@Override
-	public void run()
+	public Proxy authenticate()
 	{
 		XMLInputFactory xmlFactory = XMLInputFactory.newInstance();
 		XMLEventReader xmlEvents;
@@ -90,9 +83,9 @@ public class MpimAuthenticate extends Thread
 		String username = null;
 		String password = null;
 		String resource = null;
-
+		Proxy accounts = null;
 		try {
-			xmlEvents = xmlFactory.createXMLEventReader(new InputStreamReader(sc.socket().getInputStream()));
+			xmlEvents = xmlFactory.createXMLEventReader(new InputStreamReader(con.socket().getInputStream()));
 
 			while(xmlEvents.hasNext()) {
 				event = xmlEvents.nextEvent();
@@ -120,14 +113,12 @@ public class MpimAuthenticate extends Thread
 							stream.addAttribute("id", "" + r.nextLong());
 
 							if(useTLS) {
-								System.out.println("(II) TLS Has been activated");
 								if(restart) {
 									System.out.println("(II) The connection stream will be restarted");
 									stream.addChild(new Stanza("stream:features", true));
 									state = ConnectionState.AUTHENTICATING;	
 								} else {
-									System.out.println("(II) TLS is not activated");
-									
+									System.out.println("(II) TLS Has been activated");
 									Stanza features = new Stanza("stream:features");
 									Stanza tls = new Stanza("starttls");
 									
@@ -138,11 +129,12 @@ public class MpimAuthenticate extends Thread
 									state = ConnectionState.STARTTLS;
 								}
 							} else {
+								System.out.println("(II) TLS is not activated");
 								stream.addChild(new Stanza("stream:features", true));
 								state = ConnectionState.AUTHENTICATING;
 							}
-							sc.write(ByteBuffer.wrap(("<?xml version='1.0' ?>").getBytes()));
-							sc.write(ByteBuffer.wrap((stream.startTag() + stream.getChilds()).getBytes()));
+							con.write("<?xml version='1.0' ?>");
+							con.write((stream.startTag() + stream.getChilds()));
 
 							if(!version.equals("1.0")) {
 								/* TODO: Send incompatible version back to the initiating entity and finish the connection */
@@ -155,9 +147,7 @@ public class MpimAuthenticate extends Thread
 							echild.addAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-streams");
 							error.addChild(echild);
 
-							sc.write(ByteBuffer.wrap(error.getStanza().getBytes()));
-							sc.write(ByteBuffer.wrap(stream.endTag().getBytes()));
-							sc.close();
+							con.close();
 							break;
 						}
 
@@ -194,9 +184,8 @@ public class MpimAuthenticate extends Thread
 									notAuth.addAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-streams");
 									error.addChild(notAuth);
 
-									sc.write(ByteBuffer.wrap(error.getStanza().getBytes()));
-									sc.write(ByteBuffer.wrap(stream.endTag().getBytes()));
-									sc.close();
+									con.write(error.getStanza());
+									con.close();
 
 									break;
 								}
@@ -243,10 +232,9 @@ public class MpimAuthenticate extends Thread
 
 								iq.addChild(query);
 
-								sc.write(ByteBuffer.wrap(iq.getStanza().getBytes()));
+								con.write(iq);
 
 							} else if(iq_type.equals("set")) {
-								XMPPConnection con;
 
 								if(username == null || domain == null || password == null || resource == null) {
 									System.err.println("(EE) Either the username, domain or password is empty");
@@ -264,15 +252,16 @@ public class MpimAuthenticate extends Thread
 									iq_error.addAttribute("type", "error");
 									iq_error.addChild(error);
 
-									sc.write(ByteBuffer.wrap(iq_error.getStanza().getBytes()));
-									sc.write(ByteBuffer.wrap(stream.getStanza().getBytes()));
-									sc.close();
+									con.write(iq_error);
+									con.write(stream);
+									con.close();
 									break;
 								}
-								con = new XMPPConnection(sc, username, password, domain, resource);
+
+								con = new XMPPConnection(con.socket(), username, password, domain, resource, useTLS);
 								legacy = new LegacyMsn();
 								legacy.login(con.getBareJID(), password);
-								legacy.addCallbacks(new LoginHandler(this));
+								legacy.addCallbacks(new LoginHandler(this, con));
 								legacy.addCallbacks(new MessageHandler(con));
 								legacy.addCallbacks(new ContactListHandler(con));
 
@@ -283,10 +272,10 @@ public class MpimAuthenticate extends Thread
 
 									iqSuccess.addAttribute("type", "result");
 									iqSuccess.addAttribute("id", iq_id);
-									sc.write(ByteBuffer.wrap(iqSuccess.getStanza().getBytes()));
+									con.write(iqSuccess);
 
-									sc.configureBlocking(false);
-									sc.register(pool, SelectionKey.OP_READ, new Proxy(con, legacy));
+									// TODO: Return success since the connection was successfully
+									accounts = new Proxy(con, legacy);
 									break;
 
 								} else if(state == ConnectionState.NONAUTHENTICATED) {
@@ -300,9 +289,9 @@ public class MpimAuthenticate extends Thread
 									error.addChild(notAuth);
 									iq.addChild(error);
 
-									sc.write(ByteBuffer.wrap(iq.getStanza().getBytes()));
-									sc.write(ByteBuffer.wrap(stream.getStanza().getBytes()));
-									sc.close();
+									con.write(iq);
+									con.write(stream);
+									con.close();
 									break;
 								}
 							}
@@ -312,12 +301,12 @@ public class MpimAuthenticate extends Thread
 				} else if(state == ConnectionState.STARTTLS) {
 					if(event.isStartElement()) {
 						if(event.asStartElement().getName().getLocalPart().equals("starttls")) {
-							Socket socket = sc.socket();
+							Socket socket = con.socket();
 							/* TODO: Check for the valid namespace */
 							Stanza proceed = new Stanza("proceed", true);
 							proceed.addAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-tls");
 
-							sc.write(ByteBuffer.wrap(proceed.getStanza().getBytes()));
+							con.write(proceed);
 							
 							try {
 								SSLSocketFactory ssf = null;
@@ -332,9 +321,9 @@ public class MpimAuthenticate extends Thread
 								ssf = ctx.getSocketFactory();
 
 
-								socket = ssf.createSocket(sc.socket(), sc.socket().getInetAddress().getHostAddress(), sc.socket().getPort(), true);
+								socket = ssf.createSocket(socket, socket.getInetAddress().getHostAddress(), socket.getPort(), true);
 								((SSLSocket) socket).setUseClientMode(false);
-								sc = socket.getChannel();
+								con = new XMPPConnection(socket);
 
 							} catch (CertificateException e) {
 								e.printStackTrace();
@@ -348,9 +337,7 @@ public class MpimAuthenticate extends Thread
 								e.printStackTrace();
 							}
 
-							//client = (SSLSocket) ssf.createSocket(socket, socket.getLocalAddress().getHostAddress(), socket.getPort(), true);
-
-							xmlEvents = xmlFactory.createXMLEventReader(new InputStreamReader(sc.socket().getInputStream()));
+							xmlEvents = xmlFactory.createXMLEventReader(new InputStreamReader(socket.getInputStream()));
 							state = ConnectionState.DISCONNECTED;
 							restart = true;
 						}
@@ -363,8 +350,15 @@ public class MpimAuthenticate extends Thread
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		
+		return accounts ;
 	}
 
+	public ConnectionState getState()
+	{
+		return state;
+	}
+	
 	public synchronized void goToSleep()
 	{
 		try {
@@ -398,10 +392,10 @@ public class MpimAuthenticate extends Thread
 	private class LoginHandler implements LoginCallbacks
 	{
 		private MpimAuthenticate mpimAuth;
-
-		public LoginHandler(MpimAuthenticate auth)
+		private XMPPConnection connection;
+		public LoginHandler(MpimAuthenticate auth, XMPPConnection con)
 		{
-			assert(auth != null);
+			assert(auth != null && con != null);
 			mpimAuth = auth;
 		}
 
@@ -417,6 +411,13 @@ public class MpimAuthenticate extends Thread
 		{
 			mpimAuth.setState(ConnectionState.NONAUTHENTICATED);
 			mpimAuth.wakeMePlease();
+		}
+
+		@Override
+		public void logout()
+		{
+			if(connection != null)
+				connection.close();
 		}
 	}
 
