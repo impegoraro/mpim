@@ -91,7 +91,7 @@ public class MpimCore extends Thread
 				System.out.println("(II) Listening for connections on port " + port + "...");
 				client = serverSock.accept();
 				Thread mpim = new MpimCore(client);
-				mpim.run();
+				mpim.start();
 				client = null;
 			}	
 		} catch (IOException e) {
