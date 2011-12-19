@@ -267,7 +267,7 @@ public class LegacyMsn extends LegacyNetwork {
 			System.out.println("(DEBUG) [Network: MSN] using switchboard");
 			sw.sendText(msg);
 		} else 
-			System.out.println("(DEBUG) [Network: MSN] room not available");
+			System.out.println("(DEBUG) [Network: MSN] room not available: " + room);
 	}
 	
 	/*@Override
@@ -454,13 +454,17 @@ public class LegacyMsn extends LegacyNetwork {
 		{
 			if(messagesHandler != null) {
 				System.out.println("(II) [Network: MSN] instant message received");
-				String to = messenger.getOwner().getDisplayName();
-				String from = msnContact.getDisplayName();
 				
 				if(switchboard.getAllContacts().length > 1) {
+					String to = messenger.getOwner().getDisplayName();
+					String from = msnContact.getDisplayName();
+					
 					System.out.println("(II) [Network: MSN] group message");
 					messagesHandler.receivedGroupChatMessage(getRoomFrom(switchboard), from, to, messenger.getOwner().getDisplayName(), message.getContent());
 				} else {
+					String to = messenger.getOwner().getEmail().getEmailAddress();
+					String from = msnContact.getEmail().getEmailAddress();
+					
 					System.out.println("(II) [Network: MSN] normal message");
 					messagesHandler.receivedMessage(from, to, message.getContent());
 				}

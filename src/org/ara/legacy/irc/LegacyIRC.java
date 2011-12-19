@@ -24,7 +24,7 @@ public class LegacyIRC extends LegacyNetwork implements IRCEventListener
 {
 	private ConnectionManager manager;
 	private String self;
-	private String hostname = "86.65.39.15";
+	private String hostname = "chat.freenode.net";
 	private Session session;
 	private String channel = "#HarexTeam";
 	private Channel connectedChannel;

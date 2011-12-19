@@ -49,7 +49,7 @@ public class MpimAuthenticate
 	private String domain;
 	private ConnectionState state;
 	private Stanza stream;
-	private String keyStore = "/home/ilan/Escritorio/cert/mpim.jks";
+	private String keyStore = "/home/ilan/Desktop/cert/mpim.jks";
 	//private String certificateChain = "/home/ilan/Escritorio/cert/mpim.crt";
 	//private String privateKey = "/home/ilan/Escritorio/cert/mpim.key";
 	private char certPassword[] = "h2r3x_rul3s".toCharArray();
@@ -482,11 +482,13 @@ public class MpimAuthenticate
 		public void receivedGroupChatMessage(String room, String from, String to, String nick, String msg)
 		{
 			String tmp;
-			tmp = room + "@" +domain;
+			tmp = room + "@" + domain;
 			MessageChatStanza message = new MessageChatStanza(tmp, tmp, "groupchat", false);
 			message.addAttribute("id", "asdasda");
 			message.setBody(StringEscapeUtils.escapeHtml(msg));
 			message.addChild(new Stanza("nick", true, false).addAttribute("xmlns", "http://jabber.org/protocol/nick").setText(StringEscapeUtils.escapeHtml(nick)));
+			//<active xmlns="http://jabber.org/protocol/chatstates"/>
+			message.addChild(new Stanza("active", true).addAttribute("xmlns", "http://jabber.org/protocol/chatstates"));
 			try {
 				connection.write(message);
 			} catch (IOException e) {

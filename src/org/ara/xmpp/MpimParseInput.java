@@ -154,7 +154,7 @@ public class MpimParseInput
 							Attribute attrTo = event.asStartElement().getAttributeByName(new QName("to"));
 							Attribute attrType = event.asStartElement().getAttributeByName(new QName("type"));
 							
-							stanza = new MessageChatStanza(null, attrTo.getValue());
+							stanza = new MessageChatStanza(null, attrTo.getValue(), attrType.getValue(), false);
 							if(attrType != null)
 								stanza.addAttribute("type", attrType.getValue());
 						}
@@ -513,13 +513,22 @@ public class MpimParseInput
 								} catch (Exception e) {
 								}
 								String tmp = stanza.getAttributeValueByName("type");
-								System.out.println("(DEBUG) tmp is " + tmp);
 								if(tmp != null && tmp.equals("groupchat")) {
-									System.out.println("(DEBUG) Sending group message");
+									String roomname;
+									
 									tmp = stanza.getAttributeValueByName("to");
 									int ind = tmp.indexOf('@');
-									if(ind != -1)
+									roomname = tmp.substring(0, ind) + "@" + accounts.getConnection().getDomain();
+									
+									if(ind != -1) {
 										accounts.getHandle().sendGroupMessage(tmp.substring(0, ind), body);
+										MessageChatStanza msgecho = new MessageChatStanza(roomname, roomname, "groupchat", false);
+										msgecho.setBody(msg);
+										try {
+											accounts.getConnection().write(msgecho);
+										} catch (IOException e) {
+										}
+									}
 								}
 								else
 									accounts.getHandle().sendMessage(stanza.getAttributeValueByName("to"), msg);
