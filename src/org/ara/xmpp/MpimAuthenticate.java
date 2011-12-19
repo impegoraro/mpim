@@ -483,10 +483,10 @@ public class MpimAuthenticate
 		{
 			String tmp;
 			tmp = room + "@" + domain;
-			MessageChatStanza message = new MessageChatStanza(tmp, tmp, "groupchat", false);
+			MessageChatStanza message = new MessageChatStanza(tmp + "/" + nick, tmp, "groupchat", false);
 			message.addAttribute("id", "asdasda");
 			message.setBody(StringEscapeUtils.escapeHtml(msg));
-			message.addChild(new Stanza("nick", true, false).addAttribute("xmlns", "http://jabber.org/protocol/nick").setText(StringEscapeUtils.escapeHtml(nick)));
+			message.addChild(new Stanza("nick", true, false).addAttribute("xmlns", "http://jabber.org/protocol/nick").setText("Renato"));
 			//<active xmlns="http://jabber.org/protocol/chatstates"/>
 			message.addChild(new Stanza("active", true).addAttribute("xmlns", "http://jabber.org/protocol/chatstates"));
 			try {

@@ -460,7 +460,7 @@ public class LegacyMsn extends LegacyNetwork {
 					String from = msnContact.getDisplayName();
 					
 					System.out.println("(II) [Network: MSN] group message");
-					messagesHandler.receivedGroupChatMessage(getRoomFrom(switchboard), from, to, messenger.getOwner().getDisplayName(), message.getContent());
+					messagesHandler.receivedGroupChatMessage(getRoomFrom(switchboard), from, to, from, message.getContent());
 				} else {
 					String to = messenger.getOwner().getEmail().getEmailAddress();
 					String from = msnContact.getEmail().getEmailAddress();

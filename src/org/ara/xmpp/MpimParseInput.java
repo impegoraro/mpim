@@ -521,8 +521,10 @@ public class MpimParseInput
 									roomname = tmp.substring(0, ind) + "@" + accounts.getConnection().getDomain();
 									
 									if(ind != -1) {
+										String nick = accounts.getHandle().getNickname();
 										accounts.getHandle().sendGroupMessage(tmp.substring(0, ind), body);
-										MessageChatStanza msgecho = new MessageChatStanza(roomname, roomname, "groupchat", false);
+										MessageChatStanza msgecho = new MessageChatStanza(roomname + "/" + nick, roomname, "groupchat", false);
+										msgecho.addChild(new Stanza("nick").addAttribute("xmlns", "http://jabber.org/protocol/nick"));
 										msgecho.setBody(msg);
 										try {
 											accounts.getConnection().write(msgecho);
