@@ -42,6 +42,11 @@ public class XMPPConnection
 		return entity.getJID();
 	}
 
+	public String getDomain()
+	{
+		return entity.getDomain();
+	}
+	
 	public String getBareJID()
 	{
 		return entity.getEmail();

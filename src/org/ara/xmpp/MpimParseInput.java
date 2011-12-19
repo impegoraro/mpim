@@ -20,6 +20,7 @@ import net.sf.jml.util.Base64;
 import org.apache.http.ConnectionClosedException;
 import org.ara.legacy.LegacyContact;
 import org.ara.legacy.LegacyNetwork;
+import org.ara.legacy.LegacyRoom;
 import org.ara.xmpp.stanzas.IQStanza;
 import org.ara.xmpp.stanzas.IQStanza.IQType;
 import org.ara.xmpp.stanzas.MessageChatStanza;
@@ -78,7 +79,6 @@ public class MpimParseInput
 			}
 				throw new ConnectionClosedException("Connection is closed");
 		} catch (IOException e) {
-			e.printStackTrace();
 		}
 	}
 
@@ -141,12 +141,22 @@ public class MpimParseInput
 								stanza.addAttribute("to", attrTo.getValue());
 							
 						} else if(evTmp.getName().getLocalPart().equals("presence")) {
-							stanza = new PresenceStanza(null, null);
+							Attribute attrFrom  = evTmp.getAttributeByName(new QName("from"));
+							Attribute attrTo  = evTmp.getAttributeByName(new QName("to"));
+							String from, to;
+							
+							to = (attrTo != null) ? attrTo.getValue(): null;
+							from = (attrFrom != null) ? attrFrom.getValue(): null;
+							
+							stanza = new PresenceStanza(from, to);
 							
 						} else if(evTmp.getName().getLocalPart().equals("message")) {
 							Attribute attrTo = event.asStartElement().getAttributeByName(new QName("to"));
-
+							Attribute attrType = event.asStartElement().getAttributeByName(new QName("type"));
+							
 							stanza = new MessageChatStanza(null, attrTo.getValue());
+							if(attrType != null)
+								stanza.addAttribute("type", attrType.getValue());
 						}
 					}
 
@@ -198,12 +208,45 @@ public class MpimParseInput
 									
 								}else if(namespace.equals("http://jabber.org/protocol/disco#info")) {
 									System.out.println("(II) Sending Service Discovery (info)");
-
+									String tmp = stanza.getAttributeValueByName("to");
 									Stanza iqresult = new IQStanza(IQType.RESULT, id);
 									Stanza query = new Stanza("query");
+									Stanza identity;
+									String roomname = null;
+									query.addAttribute("xmlns", namespace);
 									
-									query.addChild(new Stanza("feature").addAttribute("var", "jabber:iq:version"));
-									query.addChild(new Stanza("feature").addAttribute("var", "vcard-temp"));
+									if(tmp != null) {
+										iqresult.addAttribute("from", tmp);
+										int ind = tmp.indexOf('@');
+										
+										if(ind != -1)
+											roomname = tmp.substring(0, ind);
+									}
+
+									if(accounts.getHandle().getChatRooms().size() == 0) {
+										identity = new Stanza("identity").addAttribute("category", "conference").addAttribute("name", "Multi-party chat rooms");
+										identity.addAttribute("type", "text");
+										query.addChild(identity);
+									} else {
+										for(LegacyRoom room : accounts.getHandle().getChatRooms()) {
+											if(!room.getRoomName().equals(roomname))
+												continue;
+											
+											identity = new Stanza("identity", true).addAttribute("category", "client");
+											//identity.addAttribute("name", room.getRoomName() + "@" + accounts.getConnection().getDomain());
+											identity.addAttribute("type", "pc");
+											query.addChild(identity);
+										}
+										
+										query.addChild(new Stanza("feature", true).addAttribute("var", "muc_temporary"));
+										query.addChild(new Stanza("feature", true).addAttribute("var", "muc_open"));
+										query.addChild(new Stanza("feature", true).addAttribute("var", "muc_nonanonymous"));
+									}
+									
+									query.addChild(new Stanza("feature", true).addAttribute("var", "jabber:iq:version"));
+									query.addChild(new Stanza("feature", true).addAttribute("var", "vcard-temp"));
+									query.addChild(new Stanza("feature", true).addAttribute("var", "urn:xmpp:ping"));
+									query.addChild(new Stanza("feature", true).addAttribute("var", "http://jabber.org/protocol/muc"));
 									iqresult.addChild(query);
 
 									try {
@@ -215,19 +258,43 @@ public class MpimParseInput
 								} else if(namespace.equals("http://jabber.org/protocol/disco#items")) {
 									System.out.println("(II) Sending Service Discovery (items)");
 
+									String tmp = stanza.getAttributeValueByName("to");
+									String roomname = null;
 									Stanza iqresult = new IQStanza(IQType.RESULT, id);
-									Stanza query = new Stanza("query", true);
-									Stanza error = new Stanza("error");
-									Stanza notAllowd = new Stanza("service-unavailable", true);
-									error.addAttribute("type", "cancel");
-
-									query.addAttribute("xmlns", "http://jabber.org/protocol/disco#items");
-									query.addAttribute("node", "http://jabber.org/protocol/commands");
+									Stanza query = new Stanza("query");
+									
+									if(tmp != null) {
+										iqresult.addAttribute("from", tmp);
+										int ind = tmp.indexOf('@');
+										
+										if(ind != -1)
+											roomname = tmp.substring(0, ind);
+									}
+									
+									if(roomname != null) {
+										for(LegacyRoom room : accounts.getHandle().getChatRooms()) {
+											if(!room.getRoomName().equals(roomname))
+												continue;
+											
+											String domain = accounts.getConnection().getDomain();
+											
+											for(LegacyContact con : room.getContacts()) {
+												Stanza item = new Stanza("item", true);
+												query.addChild(item.addAttribute("jid", room.getRoomName() + "@" + domain + "/" + con.displayName));
+											}
+										}
+									} else {
+										for(LegacyRoom room : accounts.getHandle().getChatRooms()) {
+											Stanza item = new Stanza("item", true);
+											String domain = accounts.getConnection().getDomain();
+											for(LegacyContact con : room.getContacts())
+												query.addChild(item.addAttribute("jid", room.getRoomName() + "@" + domain).addAttribute("name", con.displayName));
+										}
+									}
+									query.addAttribute("xmlns", namespace);
+									
 									iqresult.addChild(query);
-									iqresult.addChild(error);
-									notAllowd.addAttribute("xmlns" ,"urn:ietf:params:xml:ns:xmpp-stanzas");
-									error.addChild(notAllowd);
-
+									
 									try {
 										accounts.getConnection().write(iqresult);
 									} catch (IOException e) {
@@ -343,22 +410,84 @@ public class MpimParseInput
 							((PresenceStanza) stanza).setShow(xmlEvents.nextEvent().asCharacters().getData());
 						else if(event.asStartElement().getName().getLocalPart().equals("status"))
 							((PresenceStanza) stanza).setStatus(xmlEvents.nextEvent().asCharacters().getData());
+						else if(event.asStartElement().getName().getLocalPart().equals("x")) {
+							@SuppressWarnings("rawtypes")
+							Iterator i = event.asStartElement().getNamespaces();
+
+							namespace = "";
+							while(i.hasNext()) {
+								Namespace ns = (Namespace) i.next();
+								namespace = ns.getValue();
+							}
+							stanza.addChild(new Stanza("x").addAttribute("xmlns", namespace));
+						}
 						
 					} else if(event.isEndElement()) {
-
+						String to = stanza.getAttributeValueByName("to");
+						
 						if(event.asEndElement().getName().getLocalPart().equals("presence")) {
-							String status = null;
-							String show = null;
-							
-							try{
-								show = stanza.getChildValue("show");
-								status = stanza.getChildValue("status");
-							} catch(Exception e){
+							Stanza x = stanza.getChildByName("x");
+							if(x == null) {
+								String status = null;
+								String show = null;
+								
+								try{
+									show = stanza.getChildValue("show");
+									status = stanza.getChildValue("status");
+								} catch(Exception e){
+								}
+								
+								accounts.getHandle().changedStatus(show, status);
+							} else if(x.getAttributeValueByName("xmlns").equals("http://jabber.org/protocol/muc")) {
+								System.out.println("(DEBUG) Sending MUC presence");
+								String from = stanza.getAttributeValueByName("from");
+								String domain = accounts.getConnection().getDomain();
+								
+								String roomname = null;
+								int ind = to.indexOf('@');
+								
+								if(to != null) {
+									
+									if(ind != -1)
+										roomname = to.substring(0, ind);
+								}
+								ind = 0;
+								for(LegacyRoom room : accounts.getHandle().getChatRooms()) {
+									System.out.println("(DEBUG) got room " + room.getRoomName() +", and we need " + roomname);
+									if(!room.getRoomName().equals(roomname))
+										continue;
+									for(LegacyContact cc : room.getContacts()) {
+										Stanza tmp = new PresenceStanza(roomname + "@" + domain + "/" + cc.displayName, to);
+										x = new Stanza("x").addAttribute("xmlns", "http://jabber.org/protocol/muc#user");
+										
+										tmp.addChild(x);
+										Stanza item = new Stanza("item", true);
+										item.addAttribute("affiliation", ind++ == 0 ? "owner" : "admin");
+										item.addAttribute("role", "moderator");
+										
+										x.addChild(item);
+										
+										try {
+											accounts.getConnection().write(tmp);
+										} catch (IOException e) {
+										}
+									}
+								}
+								Stanza tmp = new PresenceStanza(roomname + "@" + domain + "/" + accounts.getHandle().getNickname(), to);
+								x = new Stanza("x").addAttribute("xmlns", "http://jabber.org/protocol/muc#user");
+								
+								tmp.addChild(x);
+								Stanza item = new Stanza("item", true);
+								item.addAttribute("affiliation", ind++ == 0 ? "owner" : "admin");
+								item.addAttribute("role", "moderator");
+								
+								try {
+									accounts.getConnection().write(tmp);
+								} catch (IOException e) {
+								}
 							}
 							
-							accounts.getHandle().changedStatus(show, status);
-							
-							stanza = null;
+							stanza = null;	
 						}
 					}
 
@@ -383,7 +512,17 @@ public class MpimParseInput
 									msg = stanza.getChildValue("body");
 								} catch (Exception e) {
 								}
-								accounts.getHandle().sendMessage(stanza.getAttributeValueByName("to"), msg);
+								String tmp = stanza.getAttributeValueByName("type");
+								System.out.println("(DEBUG) tmp is " + tmp);
+								if(tmp != null && tmp.equals("groupchat")) {
+									System.out.println("(DEBUG) Sending group message");
+									tmp = stanza.getAttributeValueByName("to");
+									int ind = tmp.indexOf('@');
+									if(ind != -1)
+										accounts.getHandle().sendGroupMessage(tmp.substring(0, ind), body);
+								}
+								else
+									accounts.getHandle().sendMessage(stanza.getAttributeValueByName("to"), msg);
 							}
 
 							stanza = null;

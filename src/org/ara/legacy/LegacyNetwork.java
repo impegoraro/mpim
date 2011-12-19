@@ -27,6 +27,11 @@ public abstract class LegacyNetwork
 	abstract public String getSelfAvatar();
 	abstract public String getAvatar(String user);
 
+	/* Returns the number of active chat rooms*/
+	abstract public List<LegacyRoom> getChatRooms();
+	abstract public boolean isChatRoom(String name);
+	abstract public void sendGroupMessage(String room, String msg);
+	
 	public boolean contactListReady()
 	{
 		return contactListReady;

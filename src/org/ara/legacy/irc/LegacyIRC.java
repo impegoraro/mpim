@@ -16,6 +16,7 @@ import jerklib.events.listeners.IRCEventListener;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.ara.legacy.LegacyContact;
 import org.ara.legacy.LegacyNetwork;
+import org.ara.legacy.LegacyRoom;
 import org.ara.legacy.LegacyUserStatus;
 import org.ara.legacy.LoginResult;
 
@@ -151,6 +152,12 @@ public class LegacyIRC extends LegacyNetwork implements IRCEventListener
 		return null;
 	}
 
+	/*@Override
+	public int getChatRoomCount()
+	{
+		return 0;
+	}*/
+	
 	@Override
 	public String getAvatar(String user)
 	{
@@ -198,4 +205,23 @@ public class LegacyIRC extends LegacyNetwork implements IRCEventListener
 		
 		return legContact;
 	}
+
+	@Override
+	public List<LegacyRoom> getChatRooms()
+	{
+		return null;
+	}
+
+	@Override
+	public boolean isChatRoom(String name)
+	{
+		return false;
+	}
+
+	@Override
+	public void sendGroupMessage(String room, String msg) {
+		// TODO Auto-generated method stub
+		
+	}
+
 }

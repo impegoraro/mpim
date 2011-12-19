@@ -477,5 +477,20 @@ public class MpimAuthenticate
 			} catch (IOException e) {
 			}
 		}
+
+		@Override
+		public void receivedGroupChatMessage(String room, String from, String to, String nick, String msg)
+		{
+			String tmp;
+			tmp = room + "@" +domain;
+			MessageChatStanza message = new MessageChatStanza(tmp, tmp, "groupchat", false);
+			message.addAttribute("id", "asdasda");
+			message.setBody(StringEscapeUtils.escapeHtml(msg));
+			message.addChild(new Stanza("nick", true, false).addAttribute("xmlns", "http://jabber.org/protocol/nick").setText(StringEscapeUtils.escapeHtml(nick)));
+			try {
+				connection.write(message);
+			} catch (IOException e) {
+			}
+		}
 	}
 }

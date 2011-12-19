@@ -18,6 +18,11 @@ public class MessageChatStanza  extends MessageStanza
 	
 	public MessageChatStanza(String from, String to)
 	{
+		this(from, to, "chat", false);
+	}
+	
+	public MessageChatStanza(String from, String to, String type, boolean tmp)
+	{
 		super("message");
 		
 		assert (to != null && from != null);
@@ -26,7 +31,7 @@ public class MessageChatStanza  extends MessageStanza
 		
 		addAttribute("to", to);
 		addAttribute("from", from);
-		addAttribute("type", "chat");
+		addAttribute("type", type);
 		
 		addChild(active);
 		

@@ -16,7 +16,6 @@ import net.sf.jml.MsnUserStatus;
 import net.sf.jml.event.MsnContactListAdapter;
 import net.sf.jml.event.MsnMessageAdapter;
 import net.sf.jml.event.MsnMessengerAdapter;
-import net.sf.jml.event.MsnSwitchboardListener;
 import net.sf.jml.impl.MsnMessengerFactory;
 import net.sf.jml.message.MsnControlMessage;
 import net.sf.jml.message.MsnDatacastMessage;
@@ -27,6 +26,7 @@ import net.sf.jml.util.Base64;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.ara.legacy.LegacyContact;
 import org.ara.legacy.LegacyNetwork;
+import org.ara.legacy.LegacyRoom;
 import org.ara.legacy.LegacyUserStatus;
 import org.ara.legacy.LoginResult;
 
@@ -57,7 +57,6 @@ public class LegacyMsn extends LegacyNetwork {
 		messenger.addMessengerListener(new MpimMsnMessenger());
 		messenger.addContactListListener(new MpimMsnContactList(this));
 		messenger.addMessageListener(new MpimMsnMessage());
-		messenger.addSwitchboardListener(new MpimMsnSwitchboard());
 		messenger.login();
 	}
 
@@ -221,7 +220,81 @@ public class LegacyMsn extends LegacyNetwork {
 			
 		return base64Picture;
 	}
+
+	@Override
+	public List<LegacyRoom> getChatRooms()
+	{
+		MsnSwitchboard msnsws[] = messenger.getActiveSwitchboards();
+		List<LegacyRoom> list = new ArrayList<LegacyRoom>();
+		List<LegacyContact> contacts; 
+		LegacyRoom room;
+		int i = 0;
+		for(MsnSwitchboard sw: msnsws) {
+			contacts = new ArrayList<LegacyContact>();
+			if(sw.getAllContacts().length > 1) { 
+				// This is a group chat
+				for(MsnContact c : sw.getAllContacts()) {
+					contacts.add(convertMsnContact(c));
+				}
+				
+				room = new LegacyRoom("room" + i++, contacts);
+				list.add(room);
+			}
+		}
+		return list;
+	}
 	
+	@Override
+	public boolean isChatRoom(String name)
+	{
+		MsnSwitchboard msnsws[] = messenger.getActiveSwitchboards();
+		int i = 0;
+		
+		for(MsnSwitchboard sw: msnsws) {
+			if(sw.getAllContacts().length > 1) 
+				if(("room" + i).equals(name))
+					return true;
+		}
+		return false;
+	}
+	
+	@Override
+	public void sendGroupMessage(String room, String msg)
+	{
+		MsnSwitchboard sw = getChatRoom(room);
+		System.out.println("(DEBUG) [Network: MSN] sending group message");
+		if(sw != null) {
+			System.out.println("(DEBUG) [Network: MSN] using switchboard");
+			sw.sendText(msg);
+		} else 
+			System.out.println("(DEBUG) [Network: MSN] room not available");
+	}
+	
+	/*@Override
+	public int getChatRoomCount()
+	{
+		int count = 0;
+		MsnSwitchboard[] sw = messenger.getActiveSwitchboards();
+		
+		for(int k = 0; k<sw.length; k++)
+			if(sw[k].getAllContacts().length > 1)
+				count ++;
+
+		return count;
+	}*/
+	
+	private MsnSwitchboard getChatRoom(String name)
+	{
+		MsnSwitchboard msnsws[] = messenger.getActiveSwitchboards();
+		int i = 0;
+		
+		for(MsnSwitchboard sw: msnsws) {
+			if(sw.getAllContacts().length > 1) 
+				if(("room" + i).equals(name))
+					return sw;
+		}
+		return null;
+	}
 	/* Synchronization methods */
 	
 	public synchronized void holdOn()
@@ -380,8 +453,17 @@ public class LegacyMsn extends LegacyNetwork {
 		public void instantMessageReceived(MsnSwitchboard switchboard, MsnInstantMessage message, MsnContact msnContact)
 		{
 			if(messagesHandler != null) {
-				String email = messenger.getOwner().getEmail().getEmailAddress();
-				messagesHandler.receivedMessage(msnContact.getEmail().getEmailAddress(), email, message.getContent());
+				System.out.println("(II) [Network: MSN] instant message received");
+				String to = messenger.getOwner().getDisplayName();
+				String from = msnContact.getDisplayName();
+				
+				if(switchboard.getAllContacts().length > 1) {
+					System.out.println("(II) [Network: MSN] group message");
+					messagesHandler.receivedGroupChatMessage(getRoomFrom(switchboard), from, to, messenger.getOwner().getDisplayName(), message.getContent());
+				} else {
+					System.out.println("(II) [Network: MSN] normal message");
+					messagesHandler.receivedMessage(from, to, message.getContent());
+				}
 			} else
 				System.err.println("(EE) [Network: MSN] message callback handlers not installed");
 		}
@@ -396,9 +478,8 @@ public class LegacyMsn extends LegacyNetwork {
 
 		}
 	}
-
 	
-	private class MpimMsnSwitchboard implements MsnSwitchboardListener
+	/*private class MpimMsnSwitchboard implements MsnSwitchboardListener
 	{
 		@Override
 		public void contactJoinSwitchboard(MsnSwitchboard arg0, MsnContact arg1)
@@ -424,5 +505,20 @@ public class LegacyMsn extends LegacyNetwork {
 			System.out.println("(DEBUG) [Network: MSN] the switchboard has been started");
 		}
 		
+	}*/
+	
+	private String getRoomFrom(MsnSwitchboard sw)
+	{
+		MsnSwitchboard msnsws[] = messenger.getActiveSwitchboards();
+		int i = 0;
+		
+		for(MsnSwitchboard tmp: msnsws) {
+			if(tmp.getAllContacts().length > 1) 
+				if(tmp.hashCode() == sw.hashCode())
+					return "room"+i;
+			i++;
+		}
+		
+		return null;
 	}
 }
