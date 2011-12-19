@@ -49,7 +49,7 @@ public class MpimAuthenticate
 	private String domain;
 	private ConnectionState state;
 	private Stanza stream;
-	private String keyStore = "/home/ilan/Desktop/cert/mpim.jks";
+	private String keyStore = "./cert/mpim.jks";
 	//private String certificateChain = "/home/ilan/Escritorio/cert/mpim.crt";
 	//private String privateKey = "/home/ilan/Escritorio/cert/mpim.key";
 	private char certPassword[] = "h2r3x_rul3s".toCharArray();
