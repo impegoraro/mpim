@@ -237,7 +237,7 @@ public class LegacyMsn extends LegacyNetwork {
 					contacts.add(convertMsnContact(c));
 				}
 				
-				room = new LegacyRoom("room" + i++, contacts);
+				room = new LegacyRoom(sw.hashCode() + "", contacts);
 				list.add(room);
 			}
 		}
@@ -252,7 +252,7 @@ public class LegacyMsn extends LegacyNetwork {
 		
 		for(MsnSwitchboard sw: msnsws) {
 			if(sw.getAllContacts().length > 1) 
-				if(("room" + i).equals(name))
+				if((sw.hashCode() + "").equals(name))
 					return true;
 		}
 		return false;
@@ -290,7 +290,7 @@ public class LegacyMsn extends LegacyNetwork {
 		
 		for(MsnSwitchboard sw: msnsws) {
 			if(sw.getAllContacts().length > 1) 
-				if(("room" + i).equals(name))
+				if((sw.hashCode() + "").equals(name))
 					return sw;
 		}
 		return null;
@@ -519,7 +519,7 @@ public class LegacyMsn extends LegacyNetwork {
 		for(MsnSwitchboard tmp: msnsws) {
 			if(tmp.getAllContacts().length > 1) 
 				if(tmp.hashCode() == sw.hashCode())
-					return "room"+i;
+					return sw.hashCode() + "";
 			i++;
 		}
 		
